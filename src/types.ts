@@ -4,6 +4,8 @@ export type MaterialType = 'sand' | 'soil' | 'stone' | 'gravel';
 
 export type TripStatus = 'loading' | 'on_the_way' | 'delivered' | 'cancelled';
 
+export type PaymentStatus = 'paid' | 'unpaid' | 'partial';
+
 export interface Trip {
   id: string;
   tripNumber: string; // e.g. TRK-084
@@ -19,6 +21,10 @@ export interface Trip {
   carFee?: number; // in MMK (ကားခ)
   driverFee?: number; // in MMK (ယာဉ်မောင်းခ / ဒရိုင်ဘာခ)
   fuelExpense?: number; // in MMK (ဆီဖိုး / စက်သုံးဆီစရိတ်)
+  paymentStatus?: PaymentStatus; // 'paid' (ရှင်းပြီး), 'unpaid' (အကြွေး/မရှင်းရသေး), 'partial' (တစိတ်တပိုင်း)
+  paidAmount?: number; // ပေးချေပြီးငွေ (MMK)
+  dueAmount?: number; // ကျန်ရှိသည့်ကြွေးကျန်ငွေ (MMK)
+  dueDate?: string; // ကြွေးဆပ်ရမည့်ရက် / ချိန်းရက်
   status: TripStatus;
   createdAt: string; // ISO string
   formattedTime: string;
@@ -57,9 +63,7 @@ export interface AppSettings {
   companySubtext: string;
   phone: string;
   autoPrintSlip: boolean;
-  googleSheetUrl?: string;
-  autoSyncGoogleSheet?: boolean;
-  activeGoogleSpreadsheetId?: string;
-  activeGoogleSpreadsheetName?: string;
-  activeGoogleSpreadsheetUrl?: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
+  autoSyncSupabase?: boolean;
 }

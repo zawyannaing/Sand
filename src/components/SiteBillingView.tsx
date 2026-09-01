@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { Trip, AppSettings, MaterialType } from '../types';
 import { MATERIAL_LABELS } from '../data/mockData';
-import { syncAllTripsToGoogleSheet } from '../services/googleSheetsService';
+import { syncAllTripsToSupabase } from '../services/supabaseClient';
 
 interface SiteBillingViewProps {
   trips: Trip[];
@@ -58,17 +58,16 @@ export const SiteBillingView: React.FC<SiteBillingViewProps> = ({
   const [isSyncingSheet, setIsSyncingSheet] = useState<boolean>(false);
   const [syncFeedback, setSyncFeedback] = useState<string | null>(null);
 
-  const handleSyncToGoogleSheets = async () => {
-    const url = settings?.googleSheetUrl;
-    if (!url) {
-      setSyncFeedback('⚠️ Google Sheet URL မရှိသေးပါ။ Settings တွင် ထည့်သွင်းပေးပါ။');
+  const handleSyncToSupabase = async () => {
+    if (!settings?.supabaseUrl || !settings?.supabaseAnonKey) {
+      setSyncFeedback('⚠️ Supabase URL နှင့် Key မရှိသေးပါ။ Settings တွင် ထည့်သွင်းပေးပါ။');
       setTimeout(() => setSyncFeedback(null), 4000);
       return;
     }
     setIsSyncingSheet(true);
     try {
-      const res = await syncAllTripsToGoogleSheet(filteredTrips, url);
-      setSyncFeedback(res.success ? `✅ ဆိုက်ဘေလ်စာရင်း (${filteredTrips.length} ခု) ကို Google Sheet သို့ ပို့ပြီးပါပြီ!` : `❌ ${res.message}`);
+      const res = await syncAllTripsToSupabase(filteredTrips, settings);
+      setSyncFeedback(res.success ? `✅ ဆိုက်ဘေလ်စာရင်း (${filteredTrips.length} ခု) ကို Supabase သို့ ပို့ပြီးပါပြီ!` : `❌ ${res.message}`);
     } catch (e: any) {
       setSyncFeedback(`❌ Error: ${e.message}`);
     } finally {
@@ -235,16 +234,16 @@ export const SiteBillingView: React.FC<SiteBillingViewProps> = ({
 
         {/* Action Buttons: Export CSV & Print Statement */}
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          {settings?.googleSheetUrl && (
+          {settings?.supabaseUrl && (
             <button
               type="button"
-              onClick={handleSyncToGoogleSheets}
+              onClick={handleSyncToSupabase}
               disabled={isSyncingSheet || filteredTrips.length === 0}
               className="inline-flex items-center gap-1.5 px-3.5 py-2.5 bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] rounded-lg text-xs font-bold transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
-              title="Sync current site billing data directly to Google Sheet"
+              title="Sync current site billing data directly to Supabase"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
-              <span>{isSyncingSheet ? 'Syncing...' : 'Sync to Google Sheet'}</span>
+              <span>{isSyncingSheet ? 'Syncing...' : 'Sync to Supabase'}</span>
             </button>
           )}
 

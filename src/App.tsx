@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { TabType, Trip, Driver, Vehicle, AppSettings } from './types';
+import { TabType, Trip, Driver, Vehicle, AppSettings, PaymentStatus } from './types';
 import { 
   INITIAL_TRIPS, 
   INITIAL_DRIVERS, 
@@ -104,15 +104,26 @@ import { VehiclesView } from './components/VehiclesView';
 import { SettingsView } from './components/SettingsView';
 import { ReceiptModal } from './components/ReceiptModal';
 import { NotificationModal } from './components/NotificationModal';
-import { GoogleSheetsIntegrationModal } from './components/GoogleSheetsIntegrationModal';
-import { sendTripToGoogleSheet } from './services/googleSheetsService';
-import { appendTripToGoogleSheet } from './services/googleSheetsApi';
-import { getAccessToken } from './services/googleAuth';
+import { SupabaseIntegrationModal } from './components/SupabaseIntegrationModal';
+import { 
+  syncTripSave, 
+  syncTripDelete, 
+  syncTripStatus, 
+  syncTripPayment,
+  syncDriverSave, 
+  syncDriverDelete, 
+  syncVehicleSave, 
+  syncVehicleDelete, 
+  flushOfflineQueue,
+  isOnline,
+  getPendingCount
+} from './services/offlineSync';
+import { fetchTripsFromSupabase } from './services/supabaseClient';
 
 export default function App() {
   // App navigation tab - default to 'add-trip' as shown in the mockup
   const [currentTab, setCurrentTab] = useState<TabType>('add-trip');
-  const [showGoogleSheetsModal, setShowGoogleSheetsModal] = useState<boolean>(false);
+  const [showSupabaseModal, setShowSupabaseModal] = useState<boolean>(false);
 
   // Persistence State
   const [trips, setTrips] = useState<Trip[]>(() => {
@@ -154,10 +165,6 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        // Ensure the newly requested Apps Script URL is set if older or empty
-        if (!parsed.googleSheetUrl || parsed.googleSheetUrl.includes('AKfycbwTn1_72FZOiU')) {
-          parsed.googleSheetUrl = DEFAULT_SETTINGS.googleSheetUrl;
-        }
         return { ...DEFAULT_SETTINGS, ...parsed };
       } catch (e) {
         console.error(e);
@@ -187,6 +194,55 @@ export default function App() {
     localStorage.setItem('sand_logistics_settings', JSON.stringify(settings));
   }, [settings]);
 
+  // Initial cloud fetch on startup if Supabase configured & online
+  useEffect(() => {
+    if (settings.supabaseUrl && settings.supabaseAnonKey && isOnline()) {
+      flushOfflineQueue(settings).then(() => {
+        fetchTripsFromSupabase(settings).then((cloudTrips) => {
+          if (cloudTrips && cloudTrips.length > 0) {
+            console.log(`Loaded ${cloudTrips.length} trips from Supabase DB`);
+          }
+        }).catch(err => console.warn('Supabase auto-fetch:', err));
+      });
+    }
+  }, []);
+
+  // Auto-sync when device regains internet connection
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log('App came online! Flushing offline sync queue...');
+      flushOfflineQueue(settings).then((syncedResult) => {
+        if (syncedResult.processed > 0 && settings.supabaseUrl && settings.supabaseAnonKey) {
+          fetchTripsFromSupabase(settings).then((cloudTrips) => {
+            if (cloudTrips && cloudTrips.length > 0) {
+              setTrips(cloudTrips);
+            }
+          }).catch(err => console.warn('Post-sync reload:', err));
+        }
+      });
+    };
+
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [settings]);
+
+  // Manual sync handler
+  const handleManualSync = async () => {
+    const flushedResult = await flushOfflineQueue(settings);
+    if (settings.supabaseUrl && settings.supabaseAnonKey && isOnline()) {
+      try {
+        const cloudTrips = await fetchTripsFromSupabase(settings);
+        if (cloudTrips && cloudTrips.length > 0) {
+          setTrips(cloudTrips);
+        }
+      } catch (err) {
+        console.warn('Manual sync fetch:', err);
+      }
+    }
+  };
+
   // Compute Next Trip ID (e.g. TRK-084)
   const computeNextTripId = (): string => {
     if (trips.length === 0) return 'TRK-084';
@@ -201,7 +257,7 @@ export default function App() {
     return `TRK-${String(nextNum).padStart(3, '0')}`;
   };
 
-  // Add Trip Handler
+  // Add Trip Handler (Offline-First + Auto Supabase Sync)
   const handleSaveTrip = (newTripData: Omit<Trip, 'id'>): Trip => {
     const newId = `trip-${Date.now()}`;
     const newTrip: Trip = {
@@ -211,24 +267,11 @@ export default function App() {
 
     setTrips(prev => [newTrip, ...prev]);
 
-    // Auto-sync to Google Sheet (Direct Drive/Sheet API or WebApp Script)
-    if (settings.autoSyncGoogleSheet !== false) {
-      if (settings.activeGoogleSpreadsheetId) {
-        getAccessToken().then((tok) => {
-          if (tok) {
-            appendTripToGoogleSheet(tok, settings.activeGoogleSpreadsheetId!, newTrip, trips.length).catch((err) => {
-              console.warn('Direct Google Sheet API append error:', err);
-            });
-          }
-        });
-      }
-      if (settings.googleSheetUrl) {
-        sendTripToGoogleSheet(newTrip, settings.googleSheetUrl).then((res) => {
-          console.log('Google Sheet WebApp sync result:', res);
-        }).catch(err => {
-          console.error('Google Sheet WebApp sync error:', err);
-        });
-      }
+    // Auto-sync wrapper (direct if online, offline queue if offline)
+    if (settings.autoSyncSupabase !== false) {
+      syncTripSave(newTrip, settings).catch(err => {
+        console.warn('Trip save sync note:', err);
+      });
     }
 
     return newTrip;
@@ -237,11 +280,42 @@ export default function App() {
   // Update Trip Status (e.g., delivered)
   const handleUpdateTripStatus = (tripId: string, status: Trip['status']) => {
     setTrips(prev => prev.map(t => t.id === tripId ? { ...t, status } : t));
+    if (settings.autoSyncSupabase !== false) {
+      syncTripStatus(tripId, status, settings);
+    }
   };
 
-  // Delete Trip (automatically triggers recalculation of Driver & Vehicle Today Trips, Volume, Dispatches, Status)
+  // Update Trip Payment / Settle Debt
+  const handleUpdateTripPayment = (
+    tripId: string, 
+    paymentStatus: PaymentStatus, 
+    paidAmount: number, 
+    dueAmount: number,
+    dueDate?: string
+  ) => {
+    setTrips(prev => prev.map(t => {
+      if (t.id === tripId) {
+        return {
+          ...t,
+          paymentStatus,
+          paidAmount,
+          dueAmount,
+          dueDate: dueDate !== undefined ? dueDate : t.dueDate,
+        };
+      }
+      return t;
+    }));
+    if (settings.autoSyncSupabase !== false) {
+      syncTripPayment(tripId, paymentStatus, paidAmount, dueAmount, settings);
+    }
+  };
+
+  // Delete Trip (instantly updates UI & auto-syncs deletion to Supabase or offline queue)
   const handleDeleteTrip = (tripId: string) => {
     setTrips(prev => prev.filter(t => t.id !== tripId));
+    if (settings.autoSyncSupabase !== false) {
+      syncTripDelete(tripId, settings);
+    }
   };
 
   // Add Driver
@@ -254,6 +328,9 @@ export default function App() {
       totalTrips: 0,
     };
     setBaseDrivers(prev => [newDriver, ...prev]);
+    if (settings.autoSyncSupabase !== false) {
+      syncDriverSave(newDriver, settings);
+    }
   };
 
   // Add Vehicle
@@ -265,16 +342,25 @@ export default function App() {
       totalTrips: 0,
     };
     setBaseVehicles(prev => [newVeh, ...prev]);
+    if (settings.autoSyncSupabase !== false) {
+      syncVehicleSave(newVeh, settings);
+    }
   };
 
   // Delete Driver
   const handleDeleteDriver = (driverId: string) => {
     setBaseDrivers(prev => prev.filter(d => d.id !== driverId));
+    if (settings.autoSyncSupabase !== false) {
+      syncDriverDelete(driverId, settings);
+    }
   };
 
   // Delete Vehicle
   const handleDeleteVehicle = (vehicleId: string) => {
     setBaseVehicles(prev => prev.filter(v => v.id !== vehicleId));
+    if (settings.autoSyncSupabase !== false) {
+      syncVehicleDelete(vehicleId, settings);
+    }
   };
 
   // Reset to initial mock data
@@ -304,9 +390,10 @@ export default function App() {
           currentTab={currentTab}
           onAddNewTrip={() => setCurrentTab('add-trip')}
           onOpenNotifications={() => setShowNotifications(true)}
-          onOpenGoogleSheets={() => setShowGoogleSheetsModal(true)}
+          onOpenSupabase={() => setShowSupabaseModal(true)}
+          onManualSync={handleManualSync}
           unreadNotificationsCount={pendingTripsCount}
-          hasGoogleSheetConnected={Boolean(settings.activeGoogleSpreadsheetId || settings.googleSheetUrl)}
+          hasSupabaseConnected={Boolean(settings.supabaseUrl && settings.supabaseAnonKey)}
         />
 
         {/* Dynamic Page Views */}
@@ -329,6 +416,8 @@ export default function App() {
               onSelectTab={setCurrentTab}
               onViewReceipt={(trip) => setReceiptTrip(trip)}
               onUpdateTripStatus={handleUpdateTripStatus}
+              onDeleteTrip={handleDeleteTrip}
+              onUpdateTripPayment={handleUpdateTripPayment}
             />
           )}
 
@@ -383,7 +472,7 @@ export default function App() {
               trips={trips}
               onUpdateSettings={setSettings}
               onResetData={handleResetData}
-              onOpenGoogleSheets={() => setShowGoogleSheetsModal(true)}
+              onOpenSupabase={() => setShowSupabaseModal(true)}
             />
           )}
         </main>
@@ -414,13 +503,16 @@ export default function App() {
         />
       )}
 
-      {/* Google Sheets & Drive Integration Modal */}
-      <GoogleSheetsIntegrationModal
-        isOpen={showGoogleSheetsModal}
-        onClose={() => setShowGoogleSheetsModal(false)}
+      {/* Supabase Database Integration Modal */}
+      <SupabaseIntegrationModal
+        isOpen={showSupabaseModal}
+        onClose={() => setShowSupabaseModal(false)}
         settings={settings}
         trips={trips}
+        drivers={baseDrivers}
+        vehicles={baseVehicles}
         onUpdateSettings={setSettings}
+        onSetTrips={setTrips}
       />
     </div>
   );

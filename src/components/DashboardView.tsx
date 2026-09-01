@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   Truck, 
   Layers, 
@@ -13,9 +13,18 @@ import {
   Banknote,
   Wallet,
   Coins,
-  Fuel
+  Fuel,
+  Trash2,
+  AlertTriangle,
+  X,
+  CreditCard,
+  PhoneCall,
+  Calendar,
+  Sparkles,
+  CheckCircle,
+  HelpCircle
 } from 'lucide-react';
-import { Trip, Driver, MaterialType, TabType } from '../types';
+import { Trip, Driver, MaterialType, TabType, PaymentStatus } from '../types';
 import { MATERIAL_LABELS } from '../data/mockData';
 
 interface DashboardViewProps {
@@ -24,6 +33,14 @@ interface DashboardViewProps {
   onSelectTab: (tab: TabType) => void;
   onViewReceipt: (trip: Trip) => void;
   onUpdateTripStatus: (tripId: string, status: Trip['status']) => void;
+  onDeleteTrip?: (tripId: string) => void;
+  onUpdateTripPayment?: (
+    tripId: string, 
+    paymentStatus: PaymentStatus, 
+    paidAmount: number, 
+    dueAmount: number,
+    dueDate?: string
+  ) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -32,7 +49,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectTab,
   onViewReceipt,
   onUpdateTripStatus,
+  onDeleteTrip,
+  onUpdateTripPayment,
 }) => {
+  const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
+  const [settleTrip, setSettleTrip] = useState<Trip | null>(null);
+  const [settleAmount, setSettleAmount] = useState<number | ''>('');
+  const [settleDueDate, setSettleDueDate] = useState<string>('');
+
   const todayTrips = trips;
   const totalTripsCount = todayTrips.length;
   const totalVolume = todayTrips.reduce((acc, t) => acc + (t.quantity || 0), 0);
@@ -45,6 +69,55 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalDriverFees = todayTrips.reduce((acc, t) => acc + (t.driverFee || 0), 0);
   const totalExpenses = totalFuelExpenses + totalCarFees + totalDriverFees;
   const netEarnings = totalRevenue - totalExpenses;
+
+  // Debt & Payment Breakdown
+  const totalPaidRevenue = todayTrips.reduce((acc, t) => {
+    if (t.paymentStatus === 'paid') return acc + (t.totalAmount || 0);
+    if (t.paymentStatus === 'unpaid') return acc + 0;
+    return acc + (t.paidAmount !== undefined ? t.paidAmount : (t.totalAmount || 0));
+  }, 0);
+
+  const totalOutstandingDebt = todayTrips.reduce((acc, t) => {
+    if (t.paymentStatus === 'unpaid') return acc + (t.totalAmount || 0);
+    if (t.paymentStatus === 'partial') return acc + (t.dueAmount !== undefined ? t.dueAmount : 0);
+    return acc + (t.dueAmount || 0);
+  }, 0);
+
+  const unpaidTrips = todayTrips.filter(
+    t => t.paymentStatus === 'unpaid' || t.paymentStatus === 'partial' || (t.dueAmount && t.dueAmount > 0)
+  );
+  const unpaidTripsCount = unpaidTrips.length;
+  const collectionRate = totalRevenue > 0 ? Math.round((totalPaidRevenue / totalRevenue) * 100) : 100;
+
+  // Group debts by customer
+  const customerDebts = useMemo(() => {
+    const map = new Map<string, { customerName: string; destination: string; phone: string; totalDebt: number; tripCount: number; dueDates: string[]; trips: Trip[] }>();
+    
+    unpaidTrips.forEach(trip => {
+      const key = (trip.customerName || trip.destination || 'Unassigned Customer').trim();
+      const existing = map.get(key) || {
+        customerName: key,
+        destination: trip.destination,
+        phone: trip.phone || '-',
+        totalDebt: 0,
+        tripCount: 0,
+        dueDates: [],
+        trips: [],
+      };
+      
+      const tripDebt = trip.paymentStatus === 'unpaid' 
+        ? trip.totalAmount 
+        : (trip.dueAmount || 0);
+
+      existing.totalDebt += tripDebt;
+      existing.tripCount += 1;
+      if (trip.dueDate) existing.dueDates.push(trip.dueDate);
+      existing.trips.push(trip);
+      map.set(key, existing);
+    });
+
+    return Array.from(map.values()).sort((a, b) => b.totalDebt - a.totalDebt);
+  }, [unpaidTrips]);
 
   const pendingDeliveries = trips.filter(t => t.status === 'on_the_way' || t.status === 'loading');
 
@@ -61,9 +134,33 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     }
   });
 
+  const handleOpenSettleModal = (trip: Trip) => {
+    setSettleTrip(trip);
+    setSettleAmount(trip.dueAmount || (trip.paymentStatus === 'unpaid' ? trip.totalAmount : 0));
+    setSettleDueDate(trip.dueDate || '');
+  };
+
+  const handleConfirmSettlement = (type: 'full' | 'partial') => {
+    if (!settleTrip || !onUpdateTripPayment) return;
+
+    if (type === 'full') {
+      onUpdateTripPayment(settleTrip.id, 'paid', settleTrip.totalAmount, 0, undefined);
+    } else {
+      const payingNow = typeof settleAmount === 'number' ? settleAmount : 0;
+      const currentPaid = settleTrip.paidAmount || (settleTrip.paymentStatus === 'paid' ? settleTrip.totalAmount : 0);
+      const newPaid = Math.min(settleTrip.totalAmount, currentPaid + payingNow);
+      const newDue = Math.max(0, settleTrip.totalAmount - newPaid);
+      const newStatus: PaymentStatus = newDue === 0 ? 'paid' : newPaid > 0 ? 'partial' : 'unpaid';
+
+      onUpdateTripPayment(settleTrip.id, newStatus, newPaid, newDue, settleDueDate || undefined);
+    }
+
+    setSettleTrip(null);
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-12">
-      {/* Top Stat Cards */}
+      {/* Top Stat Cards (Trips, Volume, Debt & Receivables, Gross Revenue) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Trips */}
         <div className="bg-white p-5 rounded-xl border border-[#d8c3ad]/70 shadow-xs flex flex-col justify-between">
@@ -104,30 +201,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Active Trucks */}
-        <div className="bg-white p-5 rounded-xl border border-[#d8c3ad]/70 shadow-xs flex flex-col justify-between">
+        {/* Debt & Unpaid Stat Card (NEW Requested Feature) */}
+        <div className="bg-[#fff5f5] p-5 rounded-xl border border-red-200 shadow-xs flex flex-col justify-between relative overflow-hidden">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#534434] uppercase tracking-wider">
-              Active Fleet (အလုပ်လုပ်နေသောကား)
+            <span className="text-xs font-bold text-red-900 uppercase tracking-wider flex items-center gap-1">
+              <span>ရရန်ရှိ အကြွေးကျန် (Debt)</span>
             </span>
-            <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg">
-              <Navigation className="w-5 h-5" />
+            <div className="p-2 bg-red-100 text-red-700 rounded-lg">
+              <CreditCard className="w-5 h-5" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-3xl font-extrabold text-emerald-800">{activeTrucks}</span>
-            <span className="text-xs font-semibold text-[#534434] ml-1.5">/ {drivers.length} စီး</span>
+            <span className="text-2xl sm:text-3xl font-black text-red-700">
+              {(totalOutstandingDebt / 100000).toFixed(1)} <span className="text-xs sm:text-sm font-semibold">သိန်း</span>
+            </span>
+            <p className="text-xs font-bold text-red-900 mt-0.5">
+              {totalOutstandingDebt.toLocaleString()} MMK
+            </p>
           </div>
-          <div className="mt-2 text-xs text-emerald-700 font-medium">
-            {pendingDeliveries.length} စီး လမ်းပေါ်ရောက်ရှိနေ
+          <div className="mt-2 text-[11px] text-red-700 flex items-center justify-between font-semibold border-t border-red-200/70 pt-1.5">
+            <span>{unpaidTripsCount} ခေါက် မရှင်းရသေး</span>
+            <span className="bg-red-200/80 px-1.5 py-0.5 rounded text-red-950 font-bold">
+              {100 - collectionRate}% Debt
+            </span>
           </div>
         </div>
 
-        {/* Total Revenue */}
+        {/* Gross Revenue & Cash Collection */}
         <div className="bg-white p-5 rounded-xl border border-[#d8c3ad]/70 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#534434] uppercase tracking-wider">
-              Gross Value (ရောင်းရငွေစုစုပေါင်း)
+              ရောင်းရငွေ (Gross Revenue)
             </span>
             <div className="p-2 bg-[#ffddb8] text-[#855300] rounded-lg">
               <span className="font-bold text-sm">MMK</span>
@@ -138,10 +242,171 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               {(totalRevenue / 100000).toFixed(1)} <span className="text-sm font-semibold">သိန်း</span>
             </span>
           </div>
-          <div className="mt-2 text-xs text-[#534434] truncate">
-            {totalRevenue.toLocaleString()} ကျပ်
+          <div className="mt-2 text-xs text-emerald-700 font-semibold flex items-center justify-between">
+            <span>ငွေရရှိပြီး: {totalPaidRevenue.toLocaleString()} Ks</span>
+            <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+              {collectionRate}% ရရှိ
+            </span>
           </div>
         </div>
+      </div>
+
+      {/* Debt & Receivables Command Center + AI Recommendations */}
+      <div className="bg-white rounded-2xl border border-red-200/80 p-5 shadow-xs overflow-hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-[#d8c3ad]/40 gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shadow-2xs">
+              <CreditCard className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-black text-lg text-[#151c27]">
+                  ဖောက်သည် အကြွေးစာရင်း & ကြွေးမြီစီမံခန့်ခွဲမှု (Customer Debt Tracker)
+                </h3>
+                {unpaidTripsCount > 0 && (
+                  <span className="bg-red-600 text-white text-[11px] font-extrabold px-2 py-0.5 rounded-full animate-pulse">
+                    {unpaidTripsCount} စာရင်းကျန်
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-[#534434]">
+                ဖောက်သည်အလိုက် မရှင်းရသေးသော ဘောက်ချာများနှင့် ငွေတောင်းခံရန် အကြံပြုချက်များ
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-left sm:text-right bg-red-50 px-3 py-1.5 rounded-xl border border-red-200">
+              <span className="text-[11px] font-semibold text-red-900">စုစုပေါင်း အကြွေးကျန်ငွေ:</span>
+              <div className="text-base font-black text-red-700">
+                {totalOutstandingDebt.toLocaleString()} MMK
+              </div>
+            </div>
+            <button
+              onClick={() => onSelectTab('site-billing')}
+              className="bg-[#855300] hover:bg-[#653e00] text-white text-xs font-bold px-3.5 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+            >
+              <Building2 className="w-4 h-4" />
+              <span>ဆိုက်ဘေလ်ရှင်းတမ်း</span>
+            </button>
+          </div>
+        </div>
+
+        {/* AI Recommendations Bar (အကြံပြုချက်များ) */}
+        <div className="mt-4 p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <div className="p-1.5 bg-amber-500 text-white rounded-lg shrink-0 mt-0.5">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="text-xs">
+              <span className="font-bold text-amber-950 block">
+                💡 အကြံပြုချက် (Manager Recommendation):
+              </span>
+              <span className="text-amber-900">
+                {customerDebts.length > 0 ? (
+                  <>
+                    အကြွေးအများဆုံးဖောက်သည် <strong>{customerDebts[0]?.customerName}</strong> ထံမှ ကြွေးကျန် <strong>{(customerDebts[0]?.totalDebt).toLocaleString()} MMK</strong> ကို အမြန်ဆုံးလိုက်လံကောက်ခံသင့်ပါသည်။ ငွေလက်ကျန်လည်ပတ်မှု ကောင်းမွန်စေရန် အကြွေးပေးချေမှုနှုန်းကို {collectionRate}% ထက် {Math.min(100, collectionRate + 15)}% အထိ မြှင့်တင်ပါ။
+                  </>
+                ) : (
+                  <>
+                    လက်ရှိတွင် အကြွေးကျန်မရှိပါ။ ငွေသားစီးဆင်းမှု ကျန်းမာရေး အလွန်ကောင်းမွန်ပါသည် (Cashflow 100% On Track)။
+                  </>
+                )}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Customer Debts List Grid */}
+        {customerDebts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 mt-4">
+            {customerDebts.map((item, idx) => {
+              const isTopDebt = idx === 0;
+              return (
+                <div
+                  key={item.customerName}
+                  className={`p-4 rounded-xl border transition-all flex flex-col justify-between gap-3 ${
+                    isTopDebt 
+                      ? 'bg-red-50/60 border-red-300 shadow-xs' 
+                      : 'bg-[#fdfbf9] border-[#d8c3ad]/70 hover:border-red-300'
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-sm text-[#151c27]">
+                          {item.customerName}
+                        </span>
+                        {isTopDebt && (
+                          <span className="bg-red-600 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded">
+                            TOP DEBT
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[#534434] mt-0.5">
+                        📍 {item.destination}
+                      </p>
+                      {item.phone && item.phone !== '-' && (
+                        <p className="text-[11px] text-blue-700 font-medium mt-0.5 flex items-center gap-1">
+                          <PhoneCall className="w-3 h-3" /> {item.phone}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-xs bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded-full shrink-0">
+                      {item.tripCount} ခေါက်
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-2.5 rounded-lg border border-red-200/70 flex items-center justify-between">
+                    <span className="text-xs text-gray-600 font-medium">ကြွေးကျန်ငွေ:</span>
+                    <span className="text-base font-black text-red-700">
+                      {item.totalDebt.toLocaleString()} MMK
+                    </span>
+                  </div>
+
+                  {/* Due date information */}
+                  {item.dueDates.length > 0 && (
+                    <div className="flex items-center gap-1 text-[11px] text-amber-900 font-semibold bg-amber-50 px-2 py-1 rounded">
+                      <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                      <span>ချိန်းရက်: {item.dueDates.join(', ')}</span>
+                    </div>
+                  )}
+
+                  {/* Quick Settle Actions for this customer */}
+                  <div className="flex items-center gap-2 pt-1 border-t border-[#d8c3ad]/40">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (item.trips.length > 0) {
+                          handleOpenSettleModal(item.trips[0]);
+                        }
+                      }}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                    >
+                      <CheckCircle className="w-3.5 h-3.5" />
+                      <span>ငွေရှင်းမည် (Settle)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onSelectTab('site-billing')}
+                      className="bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 text-xs font-semibold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                      title="ဘေလ်ရှင်းတမ်း ကြည့်မည်"
+                    >
+                      <span>အသေးစိတ်</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 p-6 bg-emerald-50/60 rounded-xl border border-emerald-200 text-center flex flex-col items-center justify-center gap-1.5">
+            <CheckCircle className="w-8 h-8 text-emerald-600" />
+            <h4 className="font-bold text-emerald-950 text-sm">လက်ရှိတွင် ဖောက်သည် အကြွေးကျန်မရှိပါ</h4>
+            <p className="text-xs text-emerald-800">ယနေ့ ပို့ဆောင်မှုအားလုံး ငွေသားရှင်းလင်းပြီးဖြစ်ပါသည် (All fully paid)</p>
+          </div>
+        )}
       </div>
 
       {/* Financial Expenses & Fuel Overview Section on Dashboard */}
@@ -167,7 +432,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mt-4">
-          {/* Card 1: Fuel Expenses (ဆီဖိုး စုစုပေါင်း) */}
+          {/* Card 1: Fuel Expenses */}
           <div className="bg-[#fff8eb] p-4 rounded-xl border border-amber-300/80 shadow-xs flex flex-col justify-between">
             <div className="flex items-center justify-between text-xs text-amber-950 font-bold">
               <span className="flex items-center gap-1.5">
@@ -300,13 +565,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => onUpdateTripStatus(trip.id, 'delivered')}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shrink-0"
-                >
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>ပို့ပြီး (Delivered)</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    onClick={() => onUpdateTripStatus(trip.id, 'delivered')}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>ပို့ပြီး</span>
+                  </button>
+
+                  {onDeleteTrip && (
+                    <button
+                      type="button"
+                      onClick={() => setTripToDelete(trip)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-[#d8c3ad]/50 hover:border-red-200 transition-colors cursor-pointer"
+                      title="စာရင်းမှားယွင်းထည့်မိပါက ဖျက်မည် (Remove wrong item)"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -391,7 +669,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <h3 className="font-bold text-sm sm:text-base text-[#151c27]">
               မကြာသေးမီက ပို့ဆောင်မှုများ (Recent Trips)
             </h3>
-            <p className="text-[11px] sm:text-xs text-[#534434]">ယနေ့ ပို့ဆောင်မှုနောက်ဆုံးမှတ်တမ်းများ</p>
+            <p className="text-[11px] sm:text-xs text-[#534434]">ယနေ့ ပို့ဆောင်မှုနောက်ဆုံးမှတ်တမ်းများ & ငွေပေးချေမှုအခြေအနေ</p>
           </div>
           <button
             onClick={() => onSelectTab('history')}
@@ -403,7 +681,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Mobile View: High-contrast touchable cards */}
         <div className="md:hidden divide-y divide-[#d8c3ad]/30 p-2">
-          {trips.slice(0, 5).map((trip) => {
+          {trips.slice(0, 6).map((trip) => {
             const mat = MATERIAL_LABELS[trip.materialType] || { my: trip.materialType, en: trip.materialType };
             return (
               <div key={trip.id} className="p-3 bg-white hover:bg-[#f9f9ff] rounded-xl transition-colors flex flex-col gap-2.5">
@@ -427,35 +705,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <span className="text-[11px] text-[#534434] ml-0.5">ကျင်း</span>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end">
                     <div className="font-extrabold text-[#855300] text-xs">
                       {trip.totalAmount.toLocaleString()} MMK
                     </div>
-                    {(trip.fuelExpense || trip.carFee || trip.driverFee) ? (
-                      <div className="text-[10px] text-gray-600 flex flex-col items-end">
-                        {trip.fuelExpense ? (
-                          <span className="text-amber-800 font-semibold">⛽ ဆီ: {trip.fuelExpense.toLocaleString()}</span>
-                        ) : null}
-                        <span>
-                          {trip.carFee ? `ကား: ${trip.carFee.toLocaleString()}` : ''}
-                          {trip.carFee && trip.driverFee ? ' | ' : ''}
-                          {trip.driverFee ? `ဒရိုင်ဘာ: ${trip.driverFee.toLocaleString()}` : ''}
+
+                    {/* Payment Status Tag */}
+                    <div className="mt-0.5">
+                      {trip.paymentStatus === 'paid' ? (
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          🟢 ရှင်းပြီး
                         </span>
-                      </div>
-                    ) : null}
+                      ) : trip.paymentStatus === 'unpaid' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSettleModal(trip)}
+                          className="text-[10px] font-bold text-red-800 bg-red-100 hover:bg-red-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                        >
+                          🔴 အကြွေး ({trip.dueAmount ? trip.dueAmount.toLocaleString() : trip.totalAmount.toLocaleString()} Ks)
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleOpenSettleModal(trip)}
+                          className="text-[10px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded cursor-pointer transition-colors"
+                        >
+                          🟡 တစိတ်တပိုင်း (ကျန်: {trip.dueAmount?.toLocaleString()} Ks)
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex items-center justify-between text-xs pt-0.5">
-                  <div className="text-[#534434] text-[11px] truncate max-w-[170px]" title={trip.destination}>
+                  <div className="text-[#534434] text-[11px] truncate max-w-[150px]" title={trip.destination}>
                     📍 {trip.destination}
                   </div>
 
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <button
                       type="button"
                       onClick={() => onUpdateTripStatus(trip.id, trip.status === 'delivered' ? 'on_the_way' : 'delivered')}
-                      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full border transition-all active:scale-95 ${
+                      className={`inline-flex items-center gap-1 text-[11px] font-bold px-2 py-1 rounded-full border transition-all active:scale-95 cursor-pointer ${
                         trip.status === 'delivered'
                           ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                           : 'bg-amber-50 text-amber-900 border-amber-300 animate-pulse'
@@ -466,11 +757,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                     <button
                       onClick={() => onViewReceipt(trip)}
-                      className="inline-flex items-center gap-1 text-[11px] text-[#855300] font-bold bg-[#f0f3ff] hover:bg-[#e2e8f8] px-2.5 py-1 rounded-lg border border-[#d8c3ad]/70 active:scale-95"
+                      className="inline-flex items-center gap-1 text-[11px] text-[#855300] font-bold bg-[#f0f3ff] hover:bg-[#e2e8f8] px-2.5 py-1 rounded-lg border border-[#d8c3ad]/70 active:scale-95 cursor-pointer"
                     >
                       <FileText className="w-3 h-3" />
                       <span>Slip</span>
                     </button>
+
+                    {onDeleteTrip && (
+                      <button
+                        type="button"
+                        onClick={() => setTripToDelete(trip)}
+                        className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg border border-[#d8c3ad]/50 hover:border-red-200 transition-colors cursor-pointer"
+                        title="စာရင်းမှားယွင်းထည့်မိပါက ဖျက်မည် (Delete from DB)"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -487,7 +789,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="px-4 py-3">Driver & Plate</th>
                 <th className="px-4 py-3">Material</th>
                 <th className="px-4 py-3 text-right">Quantity</th>
-                <th className="px-4 py-3 text-right">စရိတ်များ (Expenses)</th>
+                <th className="px-4 py-3 text-right">ငွေပေးချေမှု (Payment)</th>
                 <th className="px-4 py-3">Destination</th>
                 <th className="px-4 py-3">Time</th>
                 <th className="px-4 py-3 text-center">Status</th>
@@ -495,7 +797,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#d8c3ad]/30">
-              {trips.slice(0, 5).map((trip) => {
+              {trips.slice(0, 6).map((trip) => {
                 const mat = MATERIAL_LABELS[trip.materialType] || { my: trip.materialType, en: trip.materialType };
                 return (
                   <tr key={trip.id} className="hover:bg-[#f9f9ff] transition-colors">
@@ -515,27 +817,34 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {trip.quantity} <span className="text-xs font-normal text-[#534434]">ကျင်း</span>
                     </td>
                     <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                      {(trip.fuelExpense || trip.carFee || trip.driverFee) ? (
-                        <div className="text-xs space-y-0.5">
-                          {trip.fuelExpense ? (
-                            <div className="font-semibold text-amber-900">
-                              ဆီ: {trip.fuelExpense.toLocaleString()} Ks
-                            </div>
-                          ) : null}
-                          {trip.carFee ? (
-                            <div className="font-medium text-[#855300]">
-                              ကား: {trip.carFee.toLocaleString()} Ks
-                            </div>
-                          ) : null}
-                          {trip.driverFee ? (
-                            <div className="text-[11px] text-[#005ac2] font-medium">
-                              ဒရိုင်ဘာ: {trip.driverFee.toLocaleString()} Ks
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-gray-400 font-mono">-</span>
-                      )}
+                      <div className="font-extrabold text-xs text-[#855300]">
+                        {trip.totalAmount.toLocaleString()} Ks
+                      </div>
+                      <div className="mt-0.5">
+                        {trip.paymentStatus === 'paid' ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                            🟢 ရှင်းပြီး
+                          </span>
+                        ) : trip.paymentStatus === 'unpaid' ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSettleModal(trip)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-red-800 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full border border-red-200 cursor-pointer transition-colors"
+                            title="ကြွေးကျန်ငွေ ရှင်းမည်"
+                          >
+                            🔴 အကြွေး ({trip.dueAmount ? trip.dueAmount.toLocaleString() : trip.totalAmount.toLocaleString()} Ks)
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenSettleModal(trip)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-full border border-amber-200 cursor-pointer transition-colors"
+                            title="ကြွေးကျန်ငွေ ရှင်းမည်"
+                          >
+                            🟡 တစိတ်တပိုင်း ({trip.dueAmount?.toLocaleString()} Ks)
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5 text-[#534434] max-w-[180px] truncate" title={trip.destination}>
                       {trip.destination}
@@ -555,14 +864,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       )}
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <button
-                        onClick={() => onViewReceipt(trip)}
-                        className="inline-flex items-center gap-1 text-xs text-[#855300] hover:text-[#653e00] font-semibold bg-[#f0f3ff] hover:bg-[#e2e8f8] px-2.5 py-1 rounded-md border border-[#d8c3ad]/60 transition-colors cursor-pointer"
-                        title="Print / View Slip"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Slip</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => onViewReceipt(trip)}
+                          className="inline-flex items-center gap-1 text-xs text-[#855300] hover:text-[#653e00] font-semibold bg-[#f0f3ff] hover:bg-[#e2e8f8] px-2.5 py-1 rounded-md border border-[#d8c3ad]/60 transition-colors cursor-pointer"
+                          title="Print / View Slip"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                          <span>Slip</span>
+                        </button>
+
+                        {onDeleteTrip && (
+                          <button
+                            type="button"
+                            onClick={() => setTripToDelete(trip)}
+                            className="inline-flex items-center p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md border border-[#d8c3ad]/50 hover:border-red-200 transition-colors cursor-pointer"
+                            title="စာရင်းမှားယွင်းထည့်မိပါက ဖျက်မည် (Delete from DB)"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -571,6 +893,171 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Payment Settlement Modal (NEW: Directly settle debt from Dashboard) */}
+      {settleTrip && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-emerald-300 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2.5 text-emerald-950 font-bold text-base">
+                <Banknote className="w-5 h-5 text-emerald-700" />
+                <span>ငွေပေးချေမှု / အကြွေးစာရင်း ရှင်းမည်</span>
+              </div>
+              <button
+                onClick={() => setSettleTrip(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3.5">
+              <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 text-xs space-y-1.5 text-gray-800">
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">ဘောက်ချာ:</span>
+                  <span className="font-extrabold text-[#855300]">{settleTrip.tripNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">ဖောက်သည်/ဆိုက်:</span>
+                  <span className="font-bold">{settleTrip.customerName || settleTrip.destination}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600 font-medium">စုစုပေါင်းကျသင့်ငွေ:</span>
+                  <span className="font-bold">{settleTrip.totalAmount.toLocaleString()} MMK</span>
+                </div>
+                <div className="flex justify-between pt-1 border-t border-amber-200">
+                  <span className="text-red-900 font-bold">လက်ရှိ အကြွေးကျန်ငွေ:</span>
+                  <span className="font-black text-red-700 text-sm">
+                    {(settleTrip.dueAmount ?? (settleTrip.paymentStatus === 'unpaid' ? settleTrip.totalAmount : 0)).toLocaleString()} MMK
+                  </span>
+                </div>
+              </div>
+
+              {/* Partial Payment Amount Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-800">
+                  ယခုလက်ခံရရှိငွေ ပမာဏ (Received Amount - Ks):
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  max={settleTrip.dueAmount ?? settleTrip.totalAmount}
+                  step="5000"
+                  value={settleAmount}
+                  onChange={(e) => setSettleAmount(e.target.value === '' ? '' : parseFloat(e.target.value) || 0)}
+                  className="w-full bg-[#f9f9ff] border border-emerald-300 rounded-xl px-3.5 py-2.5 text-base font-bold text-emerald-950 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+              </div>
+
+              {/* Due date if still unpaid */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-gray-700">
+                  ကြွေးဆပ်ရမည့်ရက် (Due Date / ချိန်းရက်):
+                </label>
+                <input
+                  type="date"
+                  value={settleDueDate}
+                  onChange={(e) => setSettleDueDate(e.target.value)}
+                  className="w-full bg-[#f9f9ff] border border-gray-300 rounded-xl px-3 py-2 text-xs font-medium text-gray-800 focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => handleConfirmSettlement('full')}
+                className="w-full sm:flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition-all shadow-xs cursor-pointer text-center"
+              >
+                ✅ အကြွေးအားလုံးရှင်းပြီး (Mark Fully Paid)
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConfirmSettlement('partial')}
+                className="w-full sm:flex-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl transition-all shadow-xs cursor-pointer text-center"
+              >
+                🟡 တစိတ်တပိုင်းရှင်းမည် (Save Partial)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {tripToDelete && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-red-200 animate-scale-in">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2.5 text-red-600 font-bold text-base">
+                <AlertTriangle className="w-5 h-5" />
+                <span>ခေါက်စာရင်း ဖျက်ရန် အတည်ပြုပါ</span>
+              </div>
+              <button
+                onClick={() => setTripToDelete(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="py-4 space-y-3">
+              <p className="text-sm text-gray-700">
+                အောက်ပါခေါက်စာရင်းကို ဖျက်ရန် သေချာပါသလား?
+              </p>
+
+              <div className="bg-amber-50/70 border border-amber-200/80 rounded-xl p-3.5 text-xs space-y-1.5 text-gray-800">
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">ခေါက်နံပါတ်:</span>
+                  <span className="font-extrabold text-[#855300]">{tripToDelete.tripNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">ယာဉ်မောင်း & ယာဉ်အမှတ်:</span>
+                  <span className="font-bold">{tripToDelete.driverName} ({tripToDelete.licensePlate})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">ပစ္စည်း & ပမာဏ:</span>
+                  <span className="font-bold text-[#855300]">{tripToDelete.quantity} ကျင်း ({MATERIAL_LABELS[tripToDelete.materialType]?.my || tripToDelete.materialType})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">ပို့ဆောင်သည့်နေရာ:</span>
+                  <span className="font-bold">{tripToDelete.destination}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500 font-medium">ကျသင့်ငွေ:</span>
+                  <span className="font-black text-red-700">{tripToDelete.totalAmount.toLocaleString()} MMK</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-red-600 leading-relaxed font-medium bg-red-50 p-2.5 rounded-lg border border-red-200">
+                ⚠️ ဤစာရင်းကို ဖျက်လိုက်ပါက စာရင်းချုပ်များမှ ချက်ချင်း နုတ်ပယ်သွားမည်ဖြစ်ပြီး <strong>Supabase Cloud Database</strong> မှပါ အလိုအလျောက် ပယ်ဖျက်သွားပါမည် (အော့ဖ်လိုင်းဖြစ်နေပါကလည်း အင်တာနက်ချိတ်ဆက်ချိန်တွင် Auto-Sync ဖြင့် ပယ်ဖျက်ပေးပါမည်)။
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-gray-100">
+              <button
+                type="button"
+                onClick={() => setTripToDelete(null)}
+                className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              >
+                မဖျက်တော့ပါ (Cancel)
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onDeleteTrip && tripToDelete) {
+                    onDeleteTrip(tripToDelete.id);
+                  }
+                  setTripToDelete(null);
+                }}
+                className="px-4 py-2 text-xs font-bold text-white bg-red-600 hover:bg-red-700 rounded-lg shadow-sm transition-colors cursor-pointer"
+              >
+                သေချာသည် ဖျက်မည် (Confirm Delete)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

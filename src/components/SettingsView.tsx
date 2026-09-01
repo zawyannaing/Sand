@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { Settings, Save, RotateCcw, Building2, DollarSign, Globe, Phone, Check, FileSpreadsheet, RefreshCw, ExternalLink, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Settings, Save, RotateCcw, Building2, DollarSign, Globe, Phone, Check, Database, RefreshCw, ExternalLink, CheckCircle2, AlertCircle, Key, Link as LinkIcon } from 'lucide-react';
 import { AppSettings, Trip } from '../types';
-import { syncAllTripsToGoogleSheet } from '../services/googleSheetsService';
+import { testSupabaseConnection, syncAllTripsToSupabase } from '../services/supabaseClient';
 
 interface SettingsViewProps {
   settings: AppSettings;
   trips?: Trip[];
   onUpdateSettings: (newSettings: AppSettings) => void;
   onResetData: () => void;
-  onOpenGoogleSheets?: () => void;
+  onOpenSupabase?: () => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -16,7 +16,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   trips = [],
   onUpdateSettings,
   onResetData,
-  onOpenGoogleSheets,
+  onOpenSupabase,
 }) => {
   const [formState, setFormState] = useState<AppSettings>(settings);
   const [savedMessage, setSavedMessage] = useState(false);
@@ -31,17 +31,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   };
 
   const handleTestSync = async () => {
-    if (!formState.googleSheetUrl) {
-      setSyncStatus({ success: false, message: 'Google Sheets Web App URL ထည့်သွင်းပေးပါ' });
+    if (!formState.supabaseUrl || !formState.supabaseAnonKey) {
+      setSyncStatus({ success: false, message: 'Supabase URL နှင့် Anon Key ကို ထည့်သွင်းပေးပါ' });
       return;
     }
     setIsSyncing(true);
     setSyncStatus(null);
     try {
-      const result = await syncAllTripsToGoogleSheet(trips, formState.googleSheetUrl);
+      const result = await syncAllTripsToSupabase(trips, {
+        supabaseUrl: formState.supabaseUrl,
+        supabaseAnonKey: formState.supabaseAnonKey,
+      });
       setSyncStatus({ success: result.success, message: result.message });
     } catch (err: any) {
-      setSyncStatus({ success: false, message: err?.message || 'Sync Error' });
+      setSyncStatus({ success: false, message: err?.message || 'Supabase Sync Error' });
     } finally {
       setIsSyncing(false);
     }
@@ -55,7 +58,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           စနစ်ဆက်တင်များ (System Settings)
         </h2>
         <p className="text-xs text-[#534434] mt-0.5">
-          Configure default price per Kyin, site company name, Google Sheets sync, and languages
+          Configure default price per Kyin, site company name, Supabase cloud database, and languages
         </p>
       </div>
 
@@ -114,81 +117,65 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Google Sheets Sync Integration */}
+        {/* Supabase PostgreSQL Database Integration */}
         <div className="pt-4 border-t border-[#d8c3ad]/50">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-base text-[#151c27] flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-[#0F9D58]" />
-              <span>Google Sheets စာရင်းချိတ်ဆက်မှု (Google Sheets Integration)</span>
+              <Database className="w-4 h-4 text-emerald-600" />
+              <span>Supabase Cloud Database ချိတ်ဆက်မှု (Supabase DB)</span>
             </h3>
-            {onOpenGoogleSheets && (
+            {onOpenSupabase && (
               <button
                 type="button"
-                onClick={onOpenGoogleSheets}
+                onClick={onOpenSupabase}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
               >
-                <FileSpreadsheet className="w-3.5 h-3.5" />
-                <span>Google Drive / Sheets Manager</span>
+                <Database className="w-3.5 h-3.5" />
+                <span>Supabase Setup & SQL Tools</span>
               </button>
             )}
           </div>
 
-          {/* Connected Drive Sheet preview if available */}
-          {formState.activeGoogleSpreadsheetId && (
-            <div className="mb-3 p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-emerald-950 flex items-center gap-1">
-                  <span>Connected Drive Sheet:</span>
-                  <span className="underline">{formState.activeGoogleSpreadsheetName || 'Sand & Gravel Delivery Records'}</span>
-                </div>
-                <div className="text-[11px] text-emerald-700 font-mono">
-                  ID: {formState.activeGoogleSpreadsheetId}
-                </div>
-              </div>
-              {formState.activeGoogleSpreadsheetUrl && (
-                <a
-                  href={formState.activeGoogleSpreadsheetUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 px-3 py-1.5 bg-white hover:bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-bold transition-colors cursor-pointer shadow-xs"
-                >
-                  <span>Open Sheet</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
-                </a>
-              )}
-            </div>
-          )}
-
           <div className="flex flex-col gap-3">
             <div>
               <label className="text-xs font-semibold text-[#534434] block mb-1">
-                Google Sheets Web App Script URL
+                Supabase Project URL
               </label>
               <div className="flex gap-2">
                 <input
                   type="url"
-                  placeholder="https://script.google.com/macros/s/.../exec"
-                  value={formState.googleSheetUrl || ''}
-                  onChange={(e) => setFormState({ ...formState, googleSheetUrl: e.target.value })}
+                  placeholder="https://xxxxxxxxxxxxxxxxxxxx.supabase.co"
+                  value={formState.supabaseUrl || ''}
+                  onChange={(e) => setFormState({ ...formState, supabaseUrl: e.target.value })}
                   className="w-full px-3 py-2 text-xs font-mono border border-[#d8c3ad] rounded-lg bg-[#f9f9ff] text-[#151c27] focus:outline-none focus:border-[#855300]"
                 />
               </div>
-              <p className="text-[11px] text-gray-500 mt-1">
-                ကားစာရင်း အသစ်ထည့်တိုင်း ဤ Google Sheet သို့ အလိုအလျောက် ပို့ဆောင်သိမ်းဆည်းပေးမည် ဖြစ်ပါသည်။
-              </p>
+            </div>
+
+            <div>
+              <label className="text-xs font-semibold text-[#534434] block mb-1">
+                Supabase Anon Public API Key
+              </label>
+              <input
+                type="password"
+                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                value={formState.supabaseAnonKey || ''}
+                onChange={(e) => setFormState({ ...formState, supabaseAnonKey: e.target.value })}
+                className="w-full px-3 py-2 text-xs font-mono border border-[#d8c3ad] rounded-lg bg-[#f9f9ff] text-[#151c27] focus:outline-none focus:border-[#855300]"
+              />
             </div>
 
             {/* Auto-sync checkbox */}
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="checkbox"
-                id="autoSync"
-                checked={formState.autoSyncGoogleSheet !== false}
-                onChange={(e) => setFormState({ ...formState, autoSyncGoogleSheet: e.target.checked })}
+                id="autoSyncSupabase"
+                checked={formState.autoSyncSupabase !== false}
+                onChange={(e) => setFormState({ ...formState, autoSyncSupabase: e.target.checked })}
                 className="w-4 h-4 text-[#855300] rounded cursor-pointer"
               />
-              <label htmlFor="autoSync" className="text-xs font-semibold text-[#151c27] cursor-pointer">
-                ကားစာရင်းမှတ်တိုင်း Google Sheet သို့ အလိုအလျောက် ပို့မည် (Auto-Sync on Save)
+              <label htmlFor="autoSyncSupabase" className="text-xs font-semibold text-[#151c27] cursor-pointer">
+                ကားစာရင်းမှတ်တိုင်း Supabase Database သို့ အလိုအလျောက် ပို့မည် (Auto-Sync on Save)
               </label>
             </div>
 
@@ -197,11 +184,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               <button
                 type="button"
                 onClick={handleTestSync}
-                disabled={isSyncing || (!formState.googleSheetUrl && !formState.activeGoogleSpreadsheetId)}
+                disabled={isSyncing || !formState.supabaseUrl || !formState.supabaseAnonKey}
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#f0f3ff] hover:bg-[#ffddb8]/60 text-[#855300] font-bold text-xs rounded-lg border border-[#d8c3ad] transition-all disabled:opacity-50 cursor-pointer shadow-xs"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                <span>{isSyncing ? 'Syncing to Sheet...' : `Sync All Trips to Google Sheet (${trips.length} records)`}</span>
+                <span>{isSyncing ? 'Syncing to Supabase...' : `Sync All Trips to Supabase (${trips.length} records)`}</span>
               </button>
             </div>
 

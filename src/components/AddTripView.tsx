@@ -20,9 +20,11 @@ import {
   Wallet,
   Fuel,
   Plus,
-  Minus
+  Minus,
+  Calendar,
+  AlertTriangle
 } from 'lucide-react';
-import { Trip, Driver, MaterialType, AppSettings } from '../types';
+import { Trip, Driver, MaterialType, AppSettings, PaymentStatus } from '../types';
 
 interface AddTripViewProps {
   onSaveTrip: (trip: Omit<Trip, 'id'>) => Trip;
@@ -43,7 +45,7 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
 }) => {
   const [driverName, setDriverName] = useState(drivers[0]?.burmeseName || 'ဦးဘမောင်');
   const [licensePlate, setLicensePlate] = useState(drivers[0]?.licensePlate || '9ယ/12345');
-  const [quantity, setQuantity] = useState<number>(15);
+  const [quantity, setQuantity] = useState<number>(1);
   const [showDetails, setShowDetails] = useState(true);
   const [materialType, setMaterialType] = useState<MaterialType>('sand');
   const [destination, setDestination] = useState('လှိုင်သာယာ စက်မှုဇုန် (Site A)');
@@ -53,6 +55,9 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
   const [carFee, setCarFee] = useState<number>(0);
   const [driverFee, setDriverFee] = useState<number>(0);
   const [fuelExpense, setFuelExpense] = useState<number>(0);
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>('paid');
+  const [customPaidAmount, setCustomPaidAmount] = useState<number | ''>('');
+  const [dueDate, setDueDate] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [status] = useState<'on_the_way' | 'delivered'>('on_the_way');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -85,8 +90,18 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
     setErrorMessage(null);
   };
 
-  const presetQuantities = [10, 15, 20, 25, 30];
+  // Quick Selection preset quantities: 1, 2, 3, 4 (Primary requested presets)
+  const presetQuantities = [1, 2, 3, 4];
   const totalAmount = (quantity || 0) * (unitPrice || 0);
+
+  // Computed payment calculations
+  const computedPaidAmount = paymentStatus === 'paid' 
+    ? totalAmount 
+    : paymentStatus === 'unpaid' 
+      ? 0 
+      : (typeof customPaidAmount === 'number' ? customPaidAmount : 0);
+
+  const computedDueAmount = Math.max(0, totalAmount - computedPaidAmount);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,6 +137,10 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
       carFee: Number(carFee) || 0,
       driverFee: Number(driverFee) || 0,
       fuelExpense: Number(fuelExpense) || 0,
+      paymentStatus,
+      paidAmount: computedPaidAmount,
+      dueAmount: computedDueAmount,
+      dueDate: dueDate ? dueDate : undefined,
       status,
       createdAt: now.toISOString(),
       formattedTime,
@@ -138,6 +157,9 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
     setCarFee(0);
     setDriverFee(0);
     setFuelExpense(0);
+    setPaymentStatus('paid');
+    setCustomPaidAmount('');
+    setDueDate('');
     setErrorMessage(null);
   };
 
@@ -607,6 +629,148 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
                       </div>
                     </div>
                   )}
+
+                  {/* Payment & Debt Status (ငွေရှင်းခြင်း / အကြွေးစာရင်း) */}
+                  <div className="pt-3 border-t border-[#d8c3ad]/70 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-[#151c27] flex items-center gap-1.5">
+                        <Banknote className="w-4 h-4 text-[#855300]" />
+                        <span>ငွေပေးချေမှု အခြေအနေ (Payment & Debt Tracking)</span>
+                      </label>
+                      <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-white border border-[#d8c3ad] text-[#534434]">
+                        {paymentStatus === 'paid' ? 'ရှင်းပြီး (Paid)' : paymentStatus === 'unpaid' ? 'အကြွေး (Unpaid)' : 'တစိတ်တပိုင်းရှင်း (Partial)'}
+                      </span>
+                    </div>
+
+                    {/* Payment Status Switcher */}
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentStatus('paid');
+                          setCustomPaidAmount('');
+                        }}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-1 ${
+                          paymentStatus === 'paid'
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-300'
+                            : 'bg-white text-emerald-900 border-emerald-200 hover:bg-emerald-50'
+                        }`}
+                      >
+                        <span>🟢 ငွေရှင်းပြီး</span>
+                        <span className="text-[10px] font-normal opacity-90">Fully Paid</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentStatus('unpaid');
+                          setCustomPaidAmount(0);
+                        }}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-1 ${
+                          paymentStatus === 'unpaid'
+                            ? 'bg-red-600 text-white border-red-700 shadow-xs ring-2 ring-red-300'
+                            : 'bg-white text-red-900 border-red-200 hover:bg-red-50'
+                        }`}
+                      >
+                        <span>🔴 အကြွေးကျန်</span>
+                        <span className="text-[10px] font-normal opacity-90">Full Debt (0%)</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPaymentStatus('partial');
+                          if (customPaidAmount === '' || customPaidAmount === 0) {
+                            setCustomPaidAmount(Math.round(totalAmount / 2));
+                          }
+                        }}
+                        className={`py-2.5 px-2 rounded-xl text-xs font-bold transition-all border flex flex-col items-center gap-1 ${
+                          paymentStatus === 'partial'
+                            ? 'bg-amber-600 text-white border-amber-700 shadow-xs ring-2 ring-amber-300'
+                            : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-50'
+                        }`}
+                      >
+                        <span>🟡 တစိတ်တပိုင်းရှင်း</span>
+                        <span className="text-[10px] font-normal opacity-90">Partial Paid</span>
+                      </button>
+                    </div>
+
+                    {/* Partial Amount Input / Due Date Selection */}
+                    {paymentStatus === 'partial' && (
+                      <div className="p-3.5 bg-amber-50/70 rounded-xl border border-amber-200 flex flex-col gap-3 animate-fade-in">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <label className="text-xs font-semibold text-amber-950">
+                            လက်ခံရရှိငွေ (Amount Paid Now - Ks):
+                          </label>
+                          <div className="relative w-full sm:w-48">
+                            <input
+                              type="number"
+                              min="0"
+                              max={totalAmount}
+                              step="5000"
+                              value={customPaidAmount}
+                              onChange={(e) => {
+                                const val = e.target.value === '' ? '' : Math.min(totalAmount, Math.max(0, parseFloat(e.target.value) || 0));
+                                setCustomPaidAmount(val);
+                              }}
+                              placeholder="ရှင်းငွေပမာဏ"
+                              className="w-full bg-white border border-amber-300 rounded-lg px-3 py-2 text-sm font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 text-right pr-8"
+                            />
+                            <span className="absolute right-2.5 top-2.5 text-xs text-amber-800 font-semibold pointer-events-none">
+                              Ks
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Quick % buttons for partial */}
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px] text-amber-900 font-medium">အမြန်ရွေး:</span>
+                          {[0.25, 0.5, 0.75].map((pct) => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() => setCustomPaidAmount(Math.round(totalAmount * pct))}
+                              className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white border border-amber-200 text-amber-900 hover:bg-amber-100"
+                            >
+                              {(pct * 100).toFixed(0)}% ({(Math.round(totalAmount * pct)).toLocaleString()} Ks)
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Due Date & Debt Summary */}
+                    {(paymentStatus === 'unpaid' || paymentStatus === 'partial') && (
+                      <div className="p-3 bg-red-50/70 rounded-xl border border-red-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-red-950">
+                              ကျန်ရှိကြွေးကျန်ငွေ (Remaining Debt):
+                            </span>
+                            <span className="text-base font-black text-red-700">
+                              {computedDueAmount.toLocaleString()} MMK
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                          <Calendar className="w-4 h-4 text-red-600 shrink-0" />
+                          <div className="flex flex-col w-full sm:w-auto">
+                            <label className="text-[10px] font-semibold text-red-900">
+                              ကြွေးဆပ်ရမည့်ရက် (Due Date):
+                            </label>
+                            <input
+                              type="date"
+                              value={dueDate}
+                              onChange={(e) => setDueDate(e.target.value)}
+                              className="bg-white border border-red-300 rounded-lg px-2.5 py-1 text-xs text-red-950 font-medium focus:outline-none focus:ring-1 focus:ring-red-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Optional Note (Remark and note section) */}
@@ -684,6 +848,25 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
                 <span className="text-gray-600">သယ်ယူမှု:</span>
                 <span className="font-bold text-[#855300]">{savedTrip.quantity} ကျင်း • {savedTrip.totalAmount.toLocaleString()} MMK</span>
               </div>
+              
+              {/* Payment status badge in modal */}
+              <div className="flex justify-between items-center bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-200">
+                <span className="text-gray-700 font-semibold">ငွေပေးချေမှု:</span>
+                {savedTrip.paymentStatus === 'paid' ? (
+                  <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                    🟢 ငွေရှင်းပြီး (Fully Paid)
+                  </span>
+                ) : savedTrip.paymentStatus === 'unpaid' ? (
+                  <span className="font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-md">
+                    🔴 အကြွေးကျန် ({savedTrip.dueAmount?.toLocaleString()} Ks)
+                  </span>
+                ) : (
+                  <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-md">
+                    🟡 တစိတ်တပိုင်းရှင်း (ကြွေးကျန်: {savedTrip.dueAmount?.toLocaleString()} Ks)
+                  </span>
+                )}
+              </div>
+
               {((savedTrip.fuelExpense && savedTrip.fuelExpense > 0) || (savedTrip.carFee && savedTrip.carFee > 0) || (savedTrip.driverFee && savedTrip.driverFee > 0)) && (
                 <div className="flex flex-col gap-1 text-gray-700 bg-white/70 px-2.5 py-1.5 rounded-lg border border-emerald-200">
                   <span className="font-semibold text-gray-900">စရိတ်များ (Trip Expenses):</span>
@@ -704,10 +887,10 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
                 <span className="text-gray-600">ပို့မည့်နေရာ:</span>
                 <span className="font-medium text-gray-800">{savedTrip.destination}</span>
               </div>
-              {settings.googleSheetUrl && (
+              {settings.supabaseUrl && settings.autoSyncSupabase !== false && (
                 <div className="flex items-center gap-1.5 pt-1 text-emerald-800 text-[11px] font-semibold">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>Google Sheet သို့ စာရင်း အလိုအလျောက် ပို့ဆောင်ပြီးပါပြီ</span>
+                  <span>Supabase Database သို့ စာရင်း အလိုအလျောက် ပို့ဆောင်ပြီးပါပြီ</span>
                 </div>
               )}
             </div>

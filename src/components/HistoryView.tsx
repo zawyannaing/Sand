@@ -11,12 +11,12 @@ import {
   ArrowUpDown,
   AlertTriangle,
   X,
-  FileSpreadsheet,
+  Database,
   RefreshCw
 } from 'lucide-react';
 import { Trip, MaterialType, AppSettings } from '../types';
 import { MATERIAL_LABELS } from '../data/mockData';
-import { syncAllTripsToGoogleSheet } from '../services/googleSheetsService';
+import { syncAllTripsToSupabase } from '../services/supabaseClient';
 
 interface HistoryViewProps {
   trips: Trip[];
@@ -145,17 +145,16 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
     document.body.removeChild(link);
   };
 
-  const handleSyncToGoogleSheets = async () => {
-    const url = settings?.googleSheetUrl;
-    if (!url) {
-      setSyncFeedback('⚠️ Google Sheet URL မရှိသေးပါ။ Settings တွင် ထည့်သွင်းပေးပါ။');
+  const handleSyncToSupabase = async () => {
+    if (!settings?.supabaseUrl || !settings?.supabaseAnonKey) {
+      setSyncFeedback('⚠️ Supabase URL နှင့် Key မရှိသေးပါ။ Settings တွင် ထည့်သွင်းပေးပါ။');
       setTimeout(() => setSyncFeedback(null), 4000);
       return;
     }
     setIsSyncingSheet(true);
     try {
-      const res = await syncAllTripsToGoogleSheet(filteredTrips, url);
-      setSyncFeedback(res.success ? `✅ ${filteredTrips.length} records ကို Google Sheet သို့ ပို့ပြီးပါပြီ!` : `❌ ${res.message}`);
+      const res = await syncAllTripsToSupabase(filteredTrips, settings);
+      setSyncFeedback(res.success ? `✅ ${filteredTrips.length} records ကို Supabase သို့ ပို့ပြီးပါပြီ!` : `❌ ${res.message}`);
     } catch (e: any) {
       setSyncFeedback(`❌ Error: ${e.message}`);
     } finally {
@@ -183,14 +182,14 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {settings?.googleSheetUrl && (
+          {settings?.supabaseUrl && (
             <button
-              onClick={handleSyncToGoogleSheets}
+              onClick={handleSyncToSupabase}
               disabled={isSyncingSheet || filteredTrips.length === 0}
               className="inline-flex items-center gap-2 bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#166534] font-semibold text-xs px-3.5 py-2.5 rounded-lg border border-[#bbf7d0] transition-colors disabled:opacity-50 cursor-pointer"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncingSheet ? 'animate-spin' : ''}`} />
-              <span>{isSyncingSheet ? 'Syncing...' : 'Sync to Google Sheet'}</span>
+              <span>{isSyncingSheet ? 'Syncing...' : 'Sync to Supabase'}</span>
             </button>
           )}
 
