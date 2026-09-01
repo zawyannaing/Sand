@@ -1,0 +1,6 @@
+{
+  "name": "Logistics Pro - Sand Truck Delivery Tracker",
+  "description": "Sand and aggregate delivery logistics management system for tracking truck trips, drivers, quantities, materials, and fleet records.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
