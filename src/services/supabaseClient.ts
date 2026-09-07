@@ -411,6 +411,154 @@ export async function deleteVehicleFromSupabase(vehicleId: string, customConfig?
   }
 }
 
+// ----------------- REALTIME SUBSCRIPTIONS -----------------
+
+export function subscribeToRealtimeTrips(
+  onTripChange: (payload: { eventType: 'INSERT' | 'UPDATE' | 'DELETE'; newRecord?: Trip; oldRecordId?: string }) => void,
+  customConfig?: SupabaseConfig
+): (() => void) | null {
+  const client = getSupabaseClient(customConfig);
+  if (!client) return null;
+
+  try {
+    const channelName = `realtime-trips-${Math.random().toString(36).substring(2, 9)}`;
+    const channel = client
+      .channel(channelName)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'trips' },
+        (payload: any) => {
+          const eventType = payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE';
+          let newRecord: Trip | undefined = undefined;
+          if (payload.new && Object.keys(payload.new).length > 0) {
+            const row = payload.new;
+            newRecord = {
+              id: row.id,
+              tripNumber: row.trip_number || `TRK-${row.id.slice(0, 4)}`,
+              driverName: row.driver_name || '',
+              licensePlate: row.license_plate || '',
+              quantity: Number(row.quantity) || 0,
+              materialType: row.material_type || 'sand',
+              destination: row.destination || '',
+              phone: row.phone || '',
+              customerName: row.customer_name || '',
+              unitPrice: Number(row.unit_price) || 0,
+              totalAmount: Number(row.total_amount) || 0,
+              carFee: Number(row.car_fee) || 0,
+              driverFee: Number(row.driver_fee) || 0,
+              fuelExpense: Number(row.fuel_expense) || 0,
+              paymentStatus: row.payment_status || (row.due_amount > 0 ? 'unpaid' : 'paid'),
+              paidAmount: Number(row.paid_amount) || (row.payment_status === 'unpaid' ? 0 : Number(row.total_amount) || 0),
+              dueAmount: row.due_amount !== undefined && row.due_amount !== null ? Number(row.due_amount) : (row.payment_status === 'unpaid' ? Number(row.total_amount) || 0 : 0),
+              dueDate: row.due_date || undefined,
+              status: row.status || 'delivered',
+              createdAt: row.created_at || new Date().toISOString(),
+              formattedTime: row.formatted_time || '',
+              notes: row.notes || '',
+            };
+          }
+          const oldRecordId = payload.old?.id;
+          onTripChange({ eventType, newRecord, oldRecordId });
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('🟢 Supabase Realtime Trips connected successfully');
+        }
+      });
+
+    return () => {
+      client.removeChannel(channel);
+    };
+  } catch (err) {
+    console.error('Failed to subscribe to realtime trips:', err);
+    return null;
+  }
+}
+
+// ----------------- SUPABASE AUTHENTICATION -----------------
+
+export async function signInWithSupabase(
+  email: string, 
+  password: string, 
+  customConfig?: SupabaseConfig
+): Promise<{ success: boolean; user?: any; session?: any; error?: string }> {
+  const client = getSupabaseClient(customConfig);
+  if (!client) {
+    return { success: false, error: 'Supabase credentials not configured' };
+  }
+
+  try {
+    const { data, error } = await client.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      user: data.user,
+      session: data.session,
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Login failed' };
+  }
+}
+
+export async function signUpWithSupabase(
+  email: string, 
+  password: string, 
+  fullName: string, 
+  role: string = 'dispatcher',
+  customConfig?: SupabaseConfig
+): Promise<{ success: boolean; user?: any; session?: any; error?: string; message?: string }> {
+  const client = getSupabaseClient(customConfig);
+  if (!client) {
+    return { success: false, error: 'Supabase credentials not configured' };
+  }
+
+  try {
+    const { data, error } = await client.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: fullName,
+          role: role,
+        },
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return {
+      success: true,
+      user: data.user,
+      session: data.session,
+      message: data.session ? 'Account created and signed in' : 'Registration successful! Check your email if verification is required.',
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message || 'Signup failed' };
+  }
+}
+
+export async function signOutFromSupabase(customConfig?: SupabaseConfig): Promise<boolean> {
+  const client = getSupabaseClient(customConfig);
+  if (!client) return true;
+
+  try {
+    const { error } = await client.auth.signOut();
+    return !error;
+  } catch (err) {
+    return false;
+  }
+}
+
 // ----------------- SQL SCHEMA SCRIPT -----------------
 
 export const SUPABASE_SQL_SCHEMA = `-- =========================================================

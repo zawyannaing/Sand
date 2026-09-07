@@ -3,22 +3,35 @@ import {
   LayoutDashboard, 
   PlusCircle, 
   History, 
-  Building2,
+  Building2, 
   BarChart3, 
   Users, 
   Truck, 
-  Settings, 
+  Settings,
+  Sparkles,
+  LogIn
 } from 'lucide-react';
-import { TabType } from '../types';
+import { TabType, AuthUser } from '../types';
 import { DEFAULT_AVATAR } from '../data/mockData';
+import { GoogleGIcon } from './LoginModal';
 
 interface SidebarProps {
   currentTab: TabType;
   onSelectTab: (tab: TabType) => void;
   pendingTripsCount: number;
+  currentUser?: AuthUser | null;
+  onOpenUserPreview?: () => void;
+  onOpenLogin?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, pendingTripsCount }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ 
+  currentTab, 
+  onSelectTab, 
+  pendingTripsCount,
+  currentUser,
+  onOpenUserPreview,
+  onOpenLogin,
+}) => {
   const navItems = [
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'add-trip' as TabType, label: 'Add Trip', icon: PlusCircle, badge: null },
@@ -121,23 +134,51 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab, pendi
           <span className="text-[15px]">Settings</span>
         </button>
 
-        {/* User Card */}
-        <div className="flex items-center gap-3 mt-2 px-3 py-2.5 border-t border-[#d8c3ad]/40 pt-3 bg-[#f9f9ff] rounded-xl">
-          <img
-            alt="Admin User Profile"
-            className="w-10 h-10 rounded-full object-cover border border-[#d8c3ad]"
-            src={DEFAULT_AVATAR}
-            referrerPolicy="no-referrer"
-          />
-          <div className="flex flex-col min-w-0">
-            <span className="text-[13px] font-bold text-[#151c27] truncate">Admin User</span>
-            <div className="flex items-center gap-1.5">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="text-[11px] font-medium text-emerald-700">Online</span>
+        {/* User Profile Card with Live Data Preview trigger */}
+        {currentUser ? (
+          <div 
+            onClick={onOpenUserPreview}
+            className="flex items-center gap-3 mt-2 px-3 py-2.5 border border-[#d8c3ad]/50 pt-3 bg-[#fdfbf9] hover:bg-[#ffddb8]/30 rounded-2xl cursor-pointer transition-all shadow-2xs group"
+            title="Click to preview your personalized data & real-time feed"
+          >
+            <div className="relative">
+              <img
+                alt={currentUser.name}
+                className="w-10 h-10 rounded-full object-cover border border-[#d8c3ad]"
+                src={currentUser.avatarUrl || DEFAULT_AVATAR}
+                referrerPolicy="no-referrer"
+              />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 border-2 border-white animate-pulse"></span>
+            </div>
+            <div className="flex flex-col min-w-0 flex-1">
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] font-bold text-[#151c27] truncate group-hover:text-[#855300]">
+                  {currentUser.name}
+                </span>
+                <span className="shrink-0" title="Gmail Verified">
+                  <GoogleGIcon className="w-3.5 h-3.5" />
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-semibold text-[#855300] truncate">
+                  {currentUser.roleLabel?.my || 'အသုံးပြုသူ'}
+                </span>
+                <span className="text-gray-300 shrink-0">•</span>
+                <span className="text-[10px] font-bold text-emerald-700 shrink-0">Gmail Auth</span>
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <button
+            onClick={onOpenLogin}
+            className="flex items-center justify-center gap-2 mt-2 px-4 py-3 bg-[#855300] hover:bg-[#653e00] text-white rounded-2xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>အကောင့်ဝင်မည် (Sign In)</span>
+          </button>
+        )}
       </div>
     </aside>
   );
 };
+

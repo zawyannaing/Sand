@@ -1,13 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Bell, Plus, CheckCircle2, Database, Wifi, WifiOff, Cloud, CloudOff } from 'lucide-react';
-import { TabType } from '../types';
+import { RefreshCw, Bell, Plus, CheckCircle2, Database, Wifi, WifiOff, Cloud, CloudOff, User, Radio, LogIn, Sparkles } from 'lucide-react';
+import { TabType, AuthUser } from '../types';
 import { DEFAULT_AVATAR } from '../data/mockData';
+import { GoogleGIcon } from './LoginModal';
 import { subscribeSyncStatus, getPendingCount, isOnline as checkIsOnline } from '../services/offlineSync';
 
 interface HeaderProps {
   onAddNewTrip: () => void;
   onOpenNotifications: () => void;
   onOpenSupabase?: () => void;
+  onOpenLogin?: () => void;
+  onOpenUserPreview?: () => void;
+  currentUser?: AuthUser | null;
   onManualSync?: () => Promise<void>;
   unreadNotificationsCount: number;
   currentTab: TabType;
@@ -18,6 +22,9 @@ export const Header: React.FC<HeaderProps> = ({
   onAddNewTrip,
   onOpenNotifications,
   onOpenSupabase,
+  onOpenLogin,
+  onOpenUserPreview,
+  currentUser,
   onManualSync,
   unreadNotificationsCount,
   currentTab,
@@ -73,23 +80,23 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <header className="sticky top-0 z-20 flex justify-between items-center w-full px-4 md:px-8 py-3.5 bg-white/95 backdrop-blur-sm border-b border-[#d8c3ad]/30">
-      <div className="flex items-center gap-3">
-        <h2 className="font-extrabold text-[20px] md:text-[22px] tracking-tight text-[#855300] hidden md:block">
+      <div className="flex items-center gap-2.5 sm:gap-3">
+        <h2 className="font-extrabold text-[18px] md:text-[22px] tracking-tight text-[#855300] hidden sm:block">
           {title.en}
         </h2>
-        <h2 className="font-bold text-[18px] text-[#855300] md:hidden">
+        <h2 className="font-bold text-[16px] text-[#855300] sm:hidden">
           {title.my}
         </h2>
         
-        {/* Dynamic Online / Offline & Sync Queue Pill */}
+        {/* Dynamic Online / Offline & Realtime Sync Queue Pill */}
         {syncState.isOnline ? (
           <div 
             onClick={handleSyncClick}
-            title={syncState.pendingCount > 0 ? `${syncState.pendingCount} offline changes syncing to cloud` : "Connected to internet (Online Mode)"}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border shadow-xs transition-all cursor-pointer ${
+            title={syncState.pendingCount > 0 ? `${syncState.pendingCount} offline changes syncing to cloud` : "Connected to Realtime Network (Live Synced)"}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border shadow-2xs transition-all cursor-pointer ${
               syncState.pendingCount > 0
                 ? 'bg-amber-50 border-amber-300 text-amber-900'
-                : 'bg-[#f0f3ff] border-[#d8c3ad]/50 text-[#534434]'
+                : 'bg-[#f0fdf4] border-emerald-300 text-emerald-800'
             }`}
           >
             {syncState.isSyncing ? (
@@ -97,18 +104,18 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <span className={`w-2.5 h-2.5 rounded-full ${syncState.pendingCount > 0 ? 'bg-amber-500 animate-ping' : 'bg-emerald-500 animate-pulse'}`}></span>
             )}
-            <span className="text-[10px] uppercase tracking-wider font-bold">
+            <span className="text-[10px] uppercase tracking-wider font-extrabold">
               {syncState.isSyncing
                 ? 'Syncing...'
                 : syncState.pendingCount > 0
                 ? `Syncing (${syncState.pendingCount})`
-                : 'ONLINE'}
+                : '🟢 REALTIME'}
             </span>
           </div>
         ) : (
           <div 
             title="App is working offline. All additions and removals are saved locally and will auto-sync when internet connects."
-            className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full text-rose-800 shadow-xs"
+            className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-full text-rose-800 shadow-2xs"
           >
             <WifiOff className="w-3 h-3 text-rose-600" />
             <span className="text-[10px] uppercase tracking-wider font-extrabold">
@@ -125,15 +132,55 @@ export const Header: React.FC<HeaderProps> = ({
         )}
       </div>
 
-      <div className="flex items-center gap-2 md:gap-3">
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
+        {/* User Profile / Login Button */}
+        {currentUser ? (
+          <button
+            onClick={onOpenUserPreview}
+            title="View My Realtime Data Preview & Role Dashboard"
+            className="inline-flex items-center gap-2 p-1.5 sm:px-3 sm:py-1.5 rounded-xl bg-amber-50/80 hover:bg-amber-100/90 border border-amber-300/80 text-[#855300] text-xs font-bold transition-all cursor-pointer shadow-2xs group"
+          >
+            <div className="relative">
+              <img
+                src={currentUser.avatarUrl || DEFAULT_AVATAR}
+                alt={currentUser.name}
+                className="w-7 h-7 rounded-full object-cover border border-[#d8c3ad]"
+                referrerPolicy="no-referrer"
+              />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 border border-white animate-pulse"></span>
+            </div>
+            <div className="hidden md:flex flex-col text-left leading-tight">
+              <div className="flex items-center gap-1">
+                <span className="font-extrabold text-[#151c27] text-xs truncate max-w-[120px]">
+                  {currentUser.name}
+                </span>
+                <GoogleGIcon className="w-3 h-3 shrink-0" />
+              </div>
+              <span className="text-[10px] text-[#855300] font-semibold">
+                {currentUser.roleLabel?.my || 'အသုံးပြုသူ'}
+              </span>
+            </div>
+            <Sparkles className="w-3.5 h-3.5 text-amber-600 hidden sm:inline" />
+          </button>
+        ) : (
+          <button
+            onClick={onOpenLogin}
+            title="Sign In / အကောင့်ဝင်ရန်"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#855300] hover:bg-[#653e00] text-white text-xs font-bold transition-all cursor-pointer shadow-xs"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Sign In</span>
+          </button>
+        )}
+
         {/* Supabase Cloud DB Trigger */}
         <button
           onClick={onOpenSupabase}
           title="Supabase PostgreSQL Cloud DB"
-          className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-xs"
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 text-xs font-bold transition-all cursor-pointer shadow-2xs"
         >
-          <Database className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span className="hidden sm:inline">Supabase DB</span>
+          <Database className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+          <span className="hidden md:inline">Supabase DB</span>
           {hasSupabaseConnected ? (
             <span className="w-2 h-2 rounded-full bg-emerald-500" title="Connected"></span>
           ) : (
@@ -147,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Sync offline queue & reload from Supabase"
           className="p-2 rounded-full text-[#534434] hover:bg-[#f0f3ff] active:bg-[#e2e8f8] transition-colors cursor-pointer relative"
         >
-          <RefreshCw className={`w-5 h-5 ${syncState.isSyncing ? 'animate-spin text-[#855300]' : ''}`} />
+          <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${syncState.isSyncing ? 'animate-spin text-[#855300]' : ''}`} />
           {syncState.pendingCount > 0 && (
             <span className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border border-white">
               {syncState.pendingCount}
@@ -159,9 +206,9 @@ export const Header: React.FC<HeaderProps> = ({
         <button
           onClick={onOpenNotifications}
           title="Notifications"
-          className="p-2 rounded-full text-[#534434] hover:bg-[#f0f3ff] active:bg-[#e2e8f8] transition-colors relative"
+          className="p-2 rounded-full text-[#534434] hover:bg-[#f0f3ff] active:bg-[#e2e8f8] transition-colors relative cursor-pointer"
         >
-          <Bell className="w-5 h-5" />
+          <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
           {unreadNotificationsCount > 0 && (
             <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-600 rounded-full border-2 border-white animate-pulse"></span>
           )}
@@ -170,21 +217,14 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Add New Trip button (Desktop) */}
         <button
           onClick={onAddNewTrip}
-          className="hidden md:inline-flex items-center gap-2 bg-[#855300] hover:bg-[#653e00] active:scale-[0.98] text-white font-medium text-sm px-4 py-2 rounded-lg shadow-sm transition-all cursor-pointer"
+          className="hidden md:inline-flex items-center gap-2 bg-[#855300] hover:bg-[#653e00] active:scale-[0.98] text-white font-semibold text-xs px-3.5 py-2 rounded-xl shadow-xs transition-all cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Add New Trip</span>
         </button>
-
-        {/* Mobile profile avatar */}
-        <img
-          alt="Operator Avatar"
-          className="w-8 h-8 rounded-full object-cover md:hidden border border-[#d8c3ad] ml-1"
-          src={DEFAULT_AVATAR}
-          referrerPolicy="no-referrer"
-        />
       </div>
     </header>
   );
 };
+
 

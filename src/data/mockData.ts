@@ -1,6 +1,66 @@
-import { Trip, Driver, Vehicle, AppSettings, MaterialType } from '../types';
+import { Trip, Driver, Vehicle, AppSettings, MaterialType, AuthUser } from '../types';
 
 export const DEFAULT_AVATAR = 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyiZRyVbcw42pgG-ZUOJQuO7l8yg_hBY3BR98k4QENjcqWgLUmGGcuPEwJShX2V4YtNc-1zRLHg2UHM2kV42zEcJd3p7N_N0naJChHhj_itWNXvYW-cPgpxot5L4aky5t800yJlctf0rTGYqypSJfK-le5bWMXqrDD6bSr4g1z6QjjuJmXlMIkdBCeJskW7PsV4VzLwx-pyiqdRxO6UtK3qpHXc4VoEr_Sb7MZKRGOpi3V4Hl-m6Of';
+
+export const DEMO_USERS: AuthUser[] = [
+  {
+    id: 'user-admin-1',
+    email: 'zawyannaing.yanrx4@gmail.com',
+    name: 'Zaw Yan Naing',
+    burmeseName: 'ကိုဇော်ယန်နိုင် (Fleet Director)',
+    role: 'admin',
+    roleLabel: { en: 'Fleet Director / Admin', my: 'အထွေထွေ မန်နေဂျာ' },
+    phone: '09-450012345',
+    avatarUrl: DEFAULT_AVATAR,
+    lastLoginAt: new Date().toISOString(),
+  },
+  {
+    id: 'user-disp-1',
+    email: 'tintlwin.dispatcher@gmail.com',
+    name: 'U Tint Lwin',
+    burmeseName: 'ဦးတင့်လွင် (ဂိတ်မှူး)',
+    role: 'dispatcher',
+    roleLabel: { en: 'Logistics Dispatcher', my: 'ကားဂိတ်မှူး / စာရင်းကိုင်' },
+    phone: '09-790123456',
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+    lastLoginAt: new Date(Date.now() - 30 * 60000).toISOString(),
+  },
+  {
+    id: 'user-driver-1',
+    email: 'bamaung.driver912345@gmail.com',
+    name: 'U Ba Maung',
+    burmeseName: 'ဦးဘမောင် (ယာဉ်မောင်း)',
+    role: 'driver',
+    roleLabel: { en: 'Fleet Driver', my: 'ယာဉ်မောင်း' },
+    phone: '09-450012345',
+    licensePlate: '9ယ/12345',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    lastLoginAt: new Date(Date.now() - 60 * 60000).toISOString(),
+  },
+  {
+    id: 'user-site-1',
+    email: 'site.shwenagar@gmail.com',
+    name: 'U Win Htein',
+    burmeseName: 'ဦးဝင်းထိန် (ဆိုဒ်အင်ဂျင်နီယာ)',
+    role: 'site_manager',
+    roleLabel: { en: 'Construction Site Manager', my: 'ဆောက်လုပ်ရေး ဆိုက်တာဝန်ခံ' },
+    siteName: 'ရွှေနဂါး ဆောက်လုပ်ရေး',
+    phone: '09-970987654',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    lastLoginAt: new Date(Date.now() - 120 * 60000).toISOString(),
+  },
+  {
+    id: 'user-viewer-1',
+    email: 'auditor.sandlogistics@gmail.com',
+    name: 'Daw Khin Aye',
+    burmeseName: 'ဒေါ်ခင်အေး (စာရင်းစစ်)',
+    role: 'viewer',
+    roleLabel: { en: 'Auditor / Viewer', my: 'ကြည့်ရှုစစ်ဆေးသူ' },
+    phone: '09-250112233',
+    avatarUrl: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=150&auto=format&fit=crop&q=80',
+    lastLoginAt: new Date(Date.now() - 180 * 60000).toISOString(),
+  }
+];
 
 export const INITIAL_DRIVERS: Driver[] = [
   {

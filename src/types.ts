@@ -6,6 +6,31 @@ export type TripStatus = 'loading' | 'on_the_way' | 'delivered' | 'cancelled';
 
 export type PaymentStatus = 'paid' | 'unpaid' | 'partial';
 
+export type UserRole = 'admin' | 'dispatcher' | 'driver' | 'site_manager' | 'viewer';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  burmeseName?: string;
+  role: UserRole;
+  roleLabel: { en: string; my: string };
+  phone?: string;
+  licensePlate?: string; // Assigned vehicle plate for drivers
+  siteName?: string; // Assigned project site for site managers
+  avatarUrl: string;
+  lastLoginAt: string;
+}
+
+export interface RealtimeUpdateEvent {
+  id: string;
+  type: 'trip_created' | 'trip_updated' | 'trip_deleted' | 'payment_settled' | 'driver_updated';
+  title: string;
+  message: string;
+  timestamp: string;
+  data?: any;
+}
+
 export interface Trip {
   id: string;
   tripNumber: string; // e.g. TRK-084
