@@ -659,6 +659,8 @@ export default function App() {
               trips={trips}
               settings={settings}
               onViewReceipt={(trip) => setReceiptTrip(trip)}
+              onUpdateTripPayment={handleUpdateTripPayment}
+              inventory={inventory}
             />
           )}
 

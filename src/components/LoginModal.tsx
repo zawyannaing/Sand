@@ -9,13 +9,12 @@ import {
   CheckCircle2, 
   Lock, 
   Mail, 
-  Sparkles,
+  Sparkles, 
   ArrowRight,
-  Database,
-  Eye,
-  EyeOff,
+  Eye, 
+  EyeOff, 
   AlertCircle,
-  Check
+  Users
 } from 'lucide-react';
 import { AuthUser, UserRole, AppSettings } from '../types';
 import { DEMO_USERS } from '../data/mockData';
@@ -23,19 +22,12 @@ import {
   ROLE_DETAILS, 
   loginWithEmail, 
   registerWithEmail, 
-  switchDemoRole, 
-  loginWithGoogleGmail,
-  isGmailAddress 
+  switchDemoRole 
 } from '../services/authService';
 
-// Official Google Multi-Color SVG Icon
-export const GoogleGIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
-    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" fill="#FBBC05"/>
-    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/>
-  </svg>
+// Compatibility export
+export const GoogleGIcon: React.FC<{ className?: string }> = ({ className = "w-4 h-4" }) => (
+  <ShieldCheck className={className} />
 );
 
 interface LoginModalProps {
@@ -53,7 +45,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   currentUser,
   settings,
 }) => {
-  const [activeTab, setActiveTab] = useState<'google' | 'quick' | 'email' | 'register'>('google');
+  const [activeTab, setActiveTab] = useState<'quick' | 'email' | 'register'>('quick');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -65,58 +57,18 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Real-time Gmail domain validation check
-  const isInputGmail = email.trim().length > 0 && isGmailAddress(email);
-  const isInputInvalidDomain = email.includes('@') && !isGmailAddress(email);
-
-  const handleAppendGmailDomain = () => {
-    const raw = email.trim();
-    if (!raw) {
-      setEmail('zawyannaing.yanrx4@gmail.com');
-      return;
-    }
-    const cleanPrefix = raw.includes('@') ? raw.split('@')[0] : raw;
-    setEmail(`${cleanPrefix}@gmail.com`);
-    setErrorMessage(null);
-  };
-
-  // Google 1-Click Login Handler
-  const handleGoogleSignIn = async (gmailAddr: string = 'zawyannaing.yanrx4@gmail.com', name?: string, role?: UserRole) => {
-    setIsLoading(true);
-    setErrorMessage(null);
-    setSuccessMessage(null);
-
-    try {
-      const res = await loginWithGoogleGmail(gmailAddr, name, role);
-      if (res.success && res.user) {
-        setSuccessMessage(`Google Authentication Success! ${res.user.email} (${res.user.roleLabel.my}) အဖြစ် ဝင်ရောက်ပြီးပါပြီ`);
-        setTimeout(() => {
-          setIsLoading(false);
-          onLoginSuccess(res.user!);
-          onClose();
-        }, 500);
-      } else {
-        setIsLoading(false);
-        setErrorMessage(res.error || 'Google Login verification failed');
-      }
-    } catch (err: any) {
-      setIsLoading(false);
-      setErrorMessage(err.message || 'Google Login failed');
-    }
-  };
-
   // Quick Demo Role Switch
   const handleQuickLogin = (role: UserRole) => {
     setIsLoading(true);
     setErrorMessage(null);
     try {
       const user = switchDemoRole(role);
-      setSuccessMessage(`Gmail Verified: ${user.email} (${user.roleLabel.my}) ဖြင့် ဝင်ရောက်ပြီးပါပြီ!`);
+      setSuccessMessage(`အောင်မြင်ပါသည်: ${user.name} (${user.roleLabel.my}) ဖြင့် ဝင်ရောက်ပြီးပါပြီ!`);
       setTimeout(() => {
         setIsLoading(false);
         onLoginSuccess(user);
         onClose();
-      }, 400);
+      }, 350);
     } catch (err: any) {
       setIsLoading(false);
       setErrorMessage(err.message || 'Login failed');
@@ -126,13 +78,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
   // Form Submit for Email Login or Registration
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setErrorMessage('ကျေးဇူးပြု၍ Gmail လိပ်စာ ထည့်သွင်းပေးပါ');
-      return;
-    }
-
-    if (!isGmailAddress(email)) {
-      setErrorMessage('ခွင့်ပြုချက်မရှိပါ: Gmail အကောင့် (@gmail.com) ဖြင့်သာ ဝင်ရောက်ခွင့် ပြုထားပါသည် (Only @gmail.com accounts are permitted access).');
+    if (!email.trim()) {
+      setErrorMessage('ကျေးဇူးပြု၍ အီးမေးလ် သို့မဟုတ် အသုံးပြုသူအမည် ထည့်သွင်းပေးပါ');
       return;
     }
 
@@ -144,12 +91,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       if (activeTab === 'email') {
         const res = await loginWithEmail(email, password, selectedRole, settings);
         if (res.success && res.user) {
-          setSuccessMessage('Gmail အကောင့်ဝင်ရောက်မှု အောင်မြင်ပါသည်!');
+          setSuccessMessage('အကောင့်ဝင်ရောက်မှု အောင်မြင်ပါသည်!');
           setTimeout(() => {
             setIsLoading(false);
             onLoginSuccess(res.user!);
             onClose();
-          }, 500);
+          }, 350);
         } else {
           setIsLoading(false);
           setErrorMessage(res.error || 'အီးမေးလ် သို့မဟုတ် လျှို့ဝှက်နံပါတ် မှားယွင်းနေပါသည်');
@@ -158,12 +105,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
         // Registration
         const res = await registerWithEmail(email, password, fullName, selectedRole, settings);
         if (res.success && res.user) {
-          setSuccessMessage(res.message || 'Gmail အကောင့်ဖွင့်လှစ်ခြင်း အောင်မြင်ပါသည်!');
+          setSuccessMessage('အကောင့်အသစ် ဖွင့်လှစ်ပြီး ဝင်ရောက်ပြီးပါပြီ!');
           setTimeout(() => {
             setIsLoading(false);
             onLoginSuccess(res.user!);
             onClose();
-          }, 600);
+          }, 350);
         } else {
           setIsLoading(false);
           setErrorMessage(res.error || 'အကောင့်ဖွင့်လှစ်ခြင်း မအောင်မြင်ပါ');
@@ -171,12 +118,12 @@ export const LoginModal: React.FC<LoginModalProps> = ({
       }
     } catch (err: any) {
       setIsLoading(false);
-      setErrorMessage(err.message || 'စနစ်တွင် ချို့ယွင်းချက်ဖြစ်ပေါ်ပါသည်');
+      setErrorMessage(err.message || 'Error occurred');
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
       <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-[#d8c3ad]/60 overflow-hidden my-auto animate-scale-in">
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-[#151c27] via-[#242e42] to-[#151c27] p-6 text-white relative">
@@ -190,17 +137,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
 
           <div className="flex items-center gap-3.5">
             <div className="p-3 bg-white/10 border border-white/20 rounded-2xl backdrop-blur-xs shadow-inner flex items-center justify-center">
-              <GoogleGIcon className="w-7 h-7" />
+              <Truck className="w-7 h-7 text-amber-400" />
             </div>
             <div>
               <div className="inline-flex items-center gap-1.5 bg-emerald-500/25 border border-emerald-400/40 px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase text-emerald-300">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Gmail Only Access Permission
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> Account Authentication
               </div>
               <h2 className="text-xl sm:text-2xl font-black mt-1">
-                Google / Gmail Login System
+                စနစ်တွင်းသို့ ဝင်ရောက်ရန်
               </h2>
               <p className="text-xs text-gray-300 mt-0.5">
-                စနစ်အတွင်းသို့ <strong className="text-amber-300">Gmail (@gmail.com)</strong> အကောင့်ဖြင့်သာ ဝင်ရောက်ခွင့်ပြုထားပါသည်
+                သဲ/ကျောက် သယ်ယူပို့ဆောင်ရေး လုပ်ငန်းသုံး စီမံခန့်ခွဲမှုစနစ်
               </p>
             </div>
           </div>
@@ -209,42 +156,17 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           {currentUser && (
             <div className="mt-4 pt-3 border-t border-white/15 flex items-center justify-between text-xs">
               <span className="text-gray-300 flex items-center gap-1.5">
-                <GoogleGIcon className="w-3.5 h-3.5" /> ဝင်ထားသော Gmail:
+                <User className="w-3.5 h-3.5 text-amber-300" /> လက်ရှိအသုံးပြုသူ:
               </span>
               <span className="font-bold bg-white/15 px-2.5 py-1 rounded-lg truncate max-w-[240px] text-amber-200 border border-white/10 font-mono text-[11px]">
-                {currentUser.email}
+                {currentUser.name} ({currentUser.email})
               </span>
             </div>
           )}
         </div>
 
-        {/* Security Requirement Banner */}
-        <div className="bg-amber-50/90 border-b border-amber-200 px-5 py-2.5 flex items-center justify-between gap-2 text-[11px] text-amber-900 font-semibold">
-          <div className="flex items-center gap-2 min-w-0">
-            <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
-            <span className="truncate">
-              သတ်မှတ်ချက်: <strong>@gmail.com</strong> အကောင့်များသာ စနစ်အား သုံးစွဲခွင့်ရှိပါသည်
-            </span>
-          </div>
-          <span className="px-2 py-0.5 bg-amber-200/80 rounded-md font-bold text-[10px] text-amber-800 shrink-0 uppercase">
-            Strict Policy
-          </span>
-        </div>
-
         {/* Tab Navigation */}
-        <div className="flex border-b border-[#d8c3ad]/50 bg-[#f9f9ff] p-1.5 gap-1 text-xs font-bold overflow-x-auto">
-          <button
-            onClick={() => { setActiveTab('google'); setErrorMessage(null); }}
-            className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
-              activeTab === 'google'
-                ? 'bg-white text-[#151c27] shadow-xs border border-[#d8c3ad]/70 font-black'
-                : 'text-[#534434] hover:text-[#151c27]'
-            }`}
-          >
-            <GoogleGIcon className="w-4 h-4" />
-            <span>Google / Gmail ဝင်မည်</span>
-          </button>
-
+        <div className="flex border-b border-[#d8c3ad]/50 bg-[#f9f9ff] p-1.5 gap-1 text-xs font-bold">
           <button
             onClick={() => { setActiveTab('quick'); setErrorMessage(null); }}
             className={`flex-1 py-2.5 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${
@@ -253,8 +175,8 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                 : 'text-[#534434] hover:text-[#151c27]'
             }`}
           >
-            <Sparkles className="w-4 h-4 text-amber-600" />
-            <span>Roles Demo</span>
+            <Users className="w-4 h-4 text-amber-600" />
+            <span>အမြန်ဝင်ရောက်ရန် (Roles)</span>
           </button>
 
           <button
@@ -266,7 +188,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             }`}
           >
             <LogIn className="w-4 h-4" />
-            <span>Gmail Sign In</span>
+            <span>အီးမေးလ်ဖြင့် ဝင်မည်</span>
           </button>
 
           <button
@@ -278,7 +200,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             }`}
           >
             <UserPlus className="w-4 h-4" />
-            <span>Register</span>
+            <span>အကောင့်သစ်</span>
           </button>
         </div>
 
@@ -297,181 +219,74 @@ export const LoginModal: React.FC<LoginModalProps> = ({
           </div>
         )}
 
-        {/* TAB 1: Prominent Google / Gmail Sign In Flow */}
-        {activeTab === 'google' && (
-          <div className="p-6 flex flex-col gap-4">
-            {/* Primary Google Login Button */}
-            <button
-              onClick={() => handleGoogleSignIn('zawyannaing.yanrx4@gmail.com', 'Zaw Yan Naing', 'admin')}
-              disabled={isLoading}
-              className="w-full py-3.5 px-4 bg-white hover:bg-gray-50 text-gray-800 border-2 border-gray-300 hover:border-gray-400 rounded-2xl font-bold text-sm transition-all shadow-xs flex items-center justify-center gap-3 cursor-pointer group active:scale-[0.99] disabled:opacity-50"
-            >
-              <GoogleGIcon className="w-5 h-5 group-hover:scale-110 transition-transform" />
-              <span>Continue with Google (zawyannaing.yanrx4@gmail.com)</span>
-            </button>
-
-            <div className="relative flex py-1 items-center">
-              <div className="flex-grow border-t border-gray-200"></div>
-              <span className="flex-shrink mx-3 text-xs font-bold text-gray-400 uppercase tracking-wider">
-                သို့မဟုတ် ခွင့်ပြုထားသော Gmail များ
-              </span>
-              <div className="flex-grow border-t border-gray-200"></div>
-            </div>
-
-            {/* List of Verified Authorized Gmail Accounts */}
-            <div className="flex flex-col gap-2">
-              <span className="text-xs font-bold text-[#534434]">
-                အကောင့် ရွေးချယ်၍ ၁ ချက်နှိပ် ဝင်ရောက်ရန် (Choose Authorized Gmail):
-              </span>
-
-              {DEMO_USERS.map((user) => {
-                const details = ROLE_DETAILS[user.role];
-                const isCurrent = currentUser?.email.toLowerCase() === user.email.toLowerCase();
-
-                return (
-                  <button
-                    key={user.id}
-                    onClick={() => handleGoogleSignIn(user.email, user.name, user.role)}
-                    disabled={isLoading}
-                    className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 group cursor-pointer ${
-                      isCurrent
-                        ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-300'
-                        : 'bg-[#fdfbf9] border-gray-200 hover:bg-white hover:border-[#855300] hover:shadow-xs'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0">
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.name}
-                          className="w-10 h-10 rounded-full object-cover border border-gray-300"
-                          referrerPolicy="no-referrer"
-                        />
-                        <span className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-xs">
-                          <GoogleGIcon className="w-3 h-3" />
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-xs text-[#151c27] truncate">
-                            {user.name}
-                          </span>
-                          <span 
-                            className="text-[9px] font-extrabold px-1.5 py-0.5 rounded-md shrink-0"
-                            style={{ backgroundColor: details.bg, color: details.color }}
-                          >
-                            {details.my}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-gray-500 font-mono truncate font-medium">
-                          {user.email}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {isCurrent ? (
-                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-1 rounded-md flex items-center gap-1">
-                          <Check className="w-3 h-3 text-emerald-600" /> Active
-                        </span>
-                      ) : (
-                        <span className="text-xs font-bold text-[#855300] group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                          <span>Sign In</span> <ArrowRight className="w-3 h-3" />
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* TAB 2: Quick Demo Roles (All verified @gmail.com) */}
+        {/* TAB 1: Quick Role Switcher */}
         {activeTab === 'quick' && (
-          <div className="p-6 flex flex-col gap-3.5">
-            <p className="text-xs text-[#534434] font-medium leading-relaxed">
-              စနစ်၏ အခန်းကဏ္ဍ (Roles) အလိုက် သီးသန့် Dashboard & Live Data များကို စမ်းသပ်ရန် အောက်ပါ <strong>Gmail Verified</strong> အကောင့်များမှ ရွေးချယ်ဝင်ရောက်ပါ:
-            </p>
-
-            <div className="grid grid-cols-1 gap-2.5">
-              {DEMO_USERS.map((user) => {
-                const details = ROLE_DETAILS[user.role];
-                const isCurrent = currentUser?.role === user.role;
-
-                return (
-                  <button
-                    key={user.id}
-                    onClick={() => handleQuickLogin(user.role)}
-                    disabled={isLoading}
-                    className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 group cursor-pointer ${
-                      isCurrent
-                        ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-300 shadow-xs'
-                        : 'bg-[#fdfbf9] border-[#d8c3ad]/60 hover:bg-white hover:border-[#855300] hover:shadow-xs'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0">
-                        <img
-                          src={user.avatarUrl}
-                          alt={user.name}
-                          className="w-11 h-11 rounded-full object-cover border border-[#d8c3ad]"
-                          referrerPolicy="no-referrer"
-                        />
-                        <span className="absolute -bottom-1 -right-1 bg-white rounded-full p-0.5 shadow-2xs border border-gray-200">
-                          <GoogleGIcon className="w-3 h-3" />
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-extrabold text-sm text-[#151c27] truncate">
-                            {user.name}
-                          </span>
-                          <span 
-                            className="text-[10px] font-extrabold px-2 py-0.5 rounded-full shrink-0"
-                            style={{ backgroundColor: details.bg, color: details.color }}
-                          >
-                            {details.my}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-[#534434] truncate mt-0.5 font-medium">
-                          {user.role === 'driver' && `🚗 ယာဉ်နံပါတ်: ${user.licensePlate}`}
-                          {user.role === 'site_manager' && `🏗️ ဆိုဒ်: ${user.siteName}`}
-                          {user.role === 'admin' && '👑 Company Revenue, Fleet Debt & All Drivers'}
-                          {user.role === 'dispatcher' && '⚡ Trip Dispatches & Fast Vouchers'}
-                          {user.role === 'viewer' && '👁️ Financial Audit & Real-time Records'}
-                        </p>
-                        <p className="text-[10px] text-gray-500 font-mono truncate flex items-center gap-1 mt-0.5">
-                          <span className="text-emerald-600 font-bold">✓ Gmail Authorized:</span> {user.email}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      {isCurrent ? (
-                        <span className="text-[11px] font-bold text-amber-800 bg-amber-200/80 px-2 py-1 rounded-lg">
-                          Active
-                        </span>
-                      ) : (
-                        <span className="text-xs font-bold text-[#855300] group-hover:translate-x-1 transition-transform flex items-center gap-1">
-                          <span>ဝင်မည်</span> <ArrowRight className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
+          <div className="p-6 flex flex-col gap-3">
+            <div className="text-xs text-gray-500 font-medium mb-1">
+              အောက်ပါ အကောင့်များထဲမှ မိမိ အသုံးပြုလိုသော အခန်းကဏ္ဍကို ၁ ချက်နှိပ်၍ အလွယ်တကူ ဝင်ရောက်နိုင်ပါသည်:
             </div>
+
+            {DEMO_USERS.map((user) => {
+              const details = ROLE_DETAILS[user.role];
+              const isCurrent = currentUser?.email.toLowerCase() === user.email.toLowerCase();
+
+              return (
+                <button
+                  key={user.id}
+                  onClick={() => handleQuickLogin(user.role)}
+                  disabled={isLoading}
+                  className={`p-3 rounded-2xl border text-left transition-all flex items-center justify-between gap-3 group cursor-pointer ${
+                    isCurrent
+                      ? 'bg-amber-50 border-amber-400 ring-2 ring-amber-300'
+                      : 'bg-[#fdfbf9] border-gray-200 hover:bg-white hover:border-[#855300] hover:shadow-xs'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.name}
+                      className="w-10 h-10 rounded-full object-cover border border-gray-300 shrink-0"
+                      referrerPolicy="no-referrer"
+                    />
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-xs text-gray-900 truncate group-hover:text-[#855300]">
+                          {user.name}
+                        </span>
+                        {isCurrent && (
+                          <span className="text-[10px] font-bold text-amber-800 bg-amber-200/80 px-1.5 py-0.2 rounded">
+                            လက်ရှိ
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-gray-500 truncate">
+                        {user.email}
+                      </div>
+                      <div className="text-[10px] text-gray-400 truncate">
+                        {details.description}
+                      </div>
+                    </div>
+                  </div>
+
+                  <span 
+                    className="text-[10px] font-extrabold px-2.5 py-1 rounded-full shrink-0"
+                    style={{ backgroundColor: details.bg, color: details.color }}
+                  >
+                    {details.my}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         )}
 
-        {/* TAB 3 & 4: Email / Gmail Form Input */}
+        {/* TAB 2 & 3: Email Login / Registration */}
         {(activeTab === 'email' || activeTab === 'register') && (
           <form onSubmit={handleEmailSubmit} className="p-6 flex flex-col gap-4">
             {activeTab === 'register' && (
               <div>
                 <label className="block text-xs font-bold text-[#534434] uppercase tracking-wider mb-1.5">
-                  နာမည်အပြည့်အစုံ (Full Name) *
+                  အမည်အပြည့်အစုံ (Full Name) *
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -480,7 +295,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({
                     required
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    placeholder="ဥပမာ - ကိုကျော်လင်း"
+                    placeholder="ဥပမာ - ကိုအောင်ကျော်"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#d8c3ad] text-sm focus:outline-none focus:ring-2 focus:ring-[#855300] bg-white font-medium"
                   />
                 </div>
@@ -488,62 +303,23 @@ export const LoginModal: React.FC<LoginModalProps> = ({
             )}
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-xs font-bold text-[#534434] uppercase tracking-wider">
-                  Gmail လိပ်စာ (Gmail Address) *
-                </label>
-                <button
-                  type="button"
-                  onClick={handleAppendGmailDomain}
-                  className="text-[10px] text-[#855300] hover:text-[#653e00] font-extrabold bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded-md border border-amber-300 transition-colors cursor-pointer"
-                >
-                  + @gmail.com အလိုအလျောက်ထည့်မည်
-                </button>
-              </div>
-
+              <label className="block text-xs font-bold text-[#534434] uppercase tracking-wider mb-1.5">
+                အီးမေးလ် သို့မဟုတ် အသုံးပြုသူအမည် (Email / Username) *
+              </label>
               <div className="relative">
-                <div className="absolute left-3.5 top-1/2 -translate-y-1/2">
-                  <GoogleGIcon className="w-4 h-4" />
-                </div>
+                <Mail className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setErrorMessage(null);
                   }}
-                  placeholder="username@gmail.com"
-                  className={`w-full pl-10 pr-24 py-2.5 rounded-xl border text-sm focus:outline-none bg-white font-medium ${
-                    isInputGmail
-                      ? 'border-emerald-500 ring-2 ring-emerald-100'
-                      : isInputInvalidDomain
-                      ? 'border-red-400 ring-2 ring-red-100'
-                      : 'border-[#d8c3ad] focus:ring-2 focus:ring-[#855300]'
-                  }`}
+                  placeholder="name@company.com"
+                  className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#d8c3ad] text-sm focus:outline-none focus:ring-2 focus:ring-[#855300] bg-white font-medium"
                 />
-                <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                  {isInputGmail ? (
-                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-0.5">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Gmail OK
-                    </span>
-                  ) : isInputInvalidDomain ? (
-                    <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded-md">
-                      @gmail.com သာ
-                    </span>
-                  ) : (
-                    <span className="text-[10px] text-gray-400 font-mono font-semibold">
-                      @gmail.com
-                    </span>
-                  )}
-                </div>
               </div>
-
-              {isInputInvalidDomain && (
-                <p className="text-[11px] text-red-600 font-semibold mt-1 flex items-center gap-1">
-                  <AlertCircle className="w-3 h-3" /> Gmail လိပ်စာ (@gmail.com) ဖြင့်သာ စနစ်အတွင်း ဝင်ရောက်ခွင့်ရပါမည်
-                </p>
-              )}
             </div>
 
             <div>
@@ -570,90 +346,48 @@ export const LoginModal: React.FC<LoginModalProps> = ({
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-[#534434] uppercase tracking-wider mb-1.5">
-                အခန်းကဏ္ဍ ရွေးချယ်ရန် (Role / Permission) *
-              </label>
-              <select
-                value={selectedRole}
-                onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-[#d8c3ad] text-sm focus:outline-none focus:ring-2 focus:ring-[#855300] bg-white font-semibold text-[#151c27]"
-              >
-                <option value="admin">👑 Fleet Director / Admin (အထွေထွေ မန်နေဂျာ)</option>
-                <option value="dispatcher">⚡ Logistics Dispatcher (ကားဂိတ်မှူး / စာရင်းကိုင်)</option>
-                <option value="driver">🚗 Fleet Driver (ယာဉ်မောင်း)</option>
-                <option value="site_manager">🏗️ Construction Site Manager (ဆောက်လုပ်ရေး ဆိုက်တာဝန်ခံ)</option>
-                <option value="viewer">👁️ Auditor / Viewer (ကြည့်ရှုစစ်ဆေးသူ)</option>
-              </select>
-            </div>
+            {activeTab === 'register' && (
+              <div>
+                <label className="block text-xs font-bold text-[#534434] uppercase tracking-wider mb-1.5">
+                  တာဝန် / အခန်းကဏ္ဍ (Role) *
+                </label>
+                <select
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value as UserRole)}
+                  className="w-full px-3 py-2.5 rounded-xl border border-[#d8c3ad] text-sm focus:outline-none focus:ring-2 focus:ring-[#855300] bg-white font-medium"
+                >
+                  <option value="dispatcher">ကားဂိတ်မှူး / စာရင်းကိုင် (Dispatcher)</option>
+                  <option value="driver">ယာဉ်မောင်း (Fleet Driver)</option>
+                  <option value="site_manager">ဆိုက်တာဝန်ခံ (Site Engineer)</option>
+                  <option value="viewer">စာရင်းစစ် (Auditor)</option>
+                  <option value="admin">မန်နေဂျာ (Admin)</option>
+                </select>
+              </div>
+            )}
 
-            <div className="pt-2">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-[#855300] hover:bg-[#653e00] text-white font-bold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer active:scale-[0.99] disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Gmail ခွင့်ပြုချက် စစ်ဆေးနေပါသည်...</span>
-                  </>
-                ) : activeTab === 'email' ? (
-                  <>
-                    <LogIn className="w-4 h-4" />
-                    <span>Gmail ဖြင့် ဝင်ရောက်မည် (Sign In)</span>
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4" />
-                    <span>Gmail အကောင့် ဖွင့်မည် (Register)</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="text-center pt-1">
-              <p className="text-xs text-gray-500">
-                {activeTab === 'email' ? (
-                  <>
-                    အကောင့်မရှိသေးပါက{' '}
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('register')}
-                      className="text-[#855300] font-bold hover:underline cursor-pointer"
-                    >
-                      ဒီနေရာတွင် Gmail ဖြင့် အကောင့်ဖွင့်ပါ
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    အကောင့်ရှိပြီးဖြစ်ပါက{' '}
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab('email')}
-                      className="text-[#855300] font-bold hover:underline cursor-pointer"
-                    >
-                      Gmail Sign In ပြန်ဝင်ရန်
-                    </button>
-                  </>
-                )}
-              </p>
-            </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full mt-2 py-3 bg-[#855300] hover:bg-[#653e00] text-white font-black text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 active:scale-[0.99]"
+            >
+              {isLoading ? (
+                <>
+                  <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                  <span>ဆောင်ရွက်နေပါသည်...</span>
+                </>
+              ) : (
+                <>
+                  <span>{activeTab === 'email' ? 'စနစ်တွင်းသို့ ဝင်မည်' : 'အကောင့်ဖွင့်မည်'}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
           </form>
         )}
 
-        {/* Modal Footer */}
-        <div className="bg-[#f0f3ff]/60 px-6 py-3.5 border-t border-[#d8c3ad]/40 flex items-center justify-between text-xs text-[#534434]">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>Gmail Authentication & Permissions Active</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-xs font-semibold text-gray-600 hover:text-gray-900 cursor-pointer"
-          >
-            ပိတ်မည် (Close)
-          </button>
+        {/* Footer */}
+        <div className="bg-gray-50 px-6 py-3 border-t border-gray-200 text-center text-[11px] text-gray-500 font-medium">
+          Sand Logistics & Supply Co., Ltd • Enterprise Security
         </div>
       </div>
     </div>

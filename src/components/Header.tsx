@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { RefreshCw, Bell, Plus, CheckCircle2, Database, Wifi, WifiOff, Cloud, CloudOff, User, Radio, LogIn, Sparkles } from 'lucide-react';
+import { RefreshCw, Bell, Plus, CheckCircle2, Database, Wifi, WifiOff, Cloud, CloudOff, User, Radio, LogIn, Sparkles, ShieldCheck } from 'lucide-react';
 import { TabType, AuthUser } from '../types';
 import { DEFAULT_AVATAR } from '../data/mockData';
-import { GoogleGIcon } from './LoginModal';
 import { subscribeSyncStatus, getPendingCount, isOnline as checkIsOnline } from '../services/offlineSync';
 
 interface HeaderProps {
@@ -154,7 +153,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <span className="font-extrabold text-[#151c27] text-xs truncate max-w-[120px]">
                   {currentUser.name}
                 </span>
-                <GoogleGIcon className="w-3 h-3 shrink-0" />
+                <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
               </div>
               <span className="text-[10px] text-[#855300] font-semibold">
                 {currentUser.roleLabel?.my || 'အသုံးပြုသူ'}

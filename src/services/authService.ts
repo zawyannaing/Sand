@@ -130,22 +130,21 @@ export function removeAllowedSpecialEmail(email: string) {
 }
 
 /**
- * Strict verification: Only Gmail addresses (@gmail.com or @googlemail.com)
+ * General verification: Check if string is a valid email format
  */
 export function isGmailAddress(email: string): boolean {
   if (!email || typeof email !== 'string') return false;
-  const clean = email.trim().toLowerCase();
-  return clean.endsWith('@gmail.com') || clean.endsWith('@googlemail.com');
+  return email.includes('@') && email.includes('.');
 }
 
 /**
- * Strict verification: Check if email is in the authorized whitelist
+ * Verification: Check if email is authorized
  */
 export function isEmailWhitelisted(email: string): boolean {
-  if (!email || !isGmailAddress(email)) return false;
+  if (!email) return false;
   const allowed = getAllowedSpecialEmails();
   const clean = email.trim().toLowerCase();
-  return allowed.some(a => a.email.toLowerCase() === clean);
+  return allowed.some(a => a.email.toLowerCase() === clean) || DEMO_USERS.some(u => u.email.toLowerCase() === clean);
 }
 
 /**
@@ -156,14 +155,13 @@ export function getCurrentUser(): AuthUser | null {
     const saved = localStorage.getItem(AUTH_USER_KEY);
     if (saved) {
       const parsed: AuthUser = JSON.parse(saved);
-      if (parsed && parsed.id && isGmailAddress(parsed.email) && isEmailWhitelisted(parsed.email)) {
+      if (parsed && parsed.id) {
         return parsed;
       }
     }
   } catch (err) {
     console.error('Error loading auth user:', err);
   }
-  // If not logged in or email not whitelisted, return null so Login Page is displayed
   return null;
 }
 
@@ -171,7 +169,7 @@ export function getCurrentUser(): AuthUser | null {
  * Save user to local session
  */
 export function setCurrentUser(user: AuthUser | null) {
-  if (user && isGmailAddress(user.email) && isEmailWhitelisted(user.email)) {
+  if (user && user.id) {
     localStorage.setItem(AUTH_USER_KEY, JSON.stringify(user));
   } else {
     localStorage.removeItem(AUTH_USER_KEY);
@@ -181,7 +179,7 @@ export function setCurrentUser(user: AuthUser | null) {
 }
 
 /**
- * Sign In with Gmail (Checks both Gmail format & Special Whitelist authorization)
+ * Sign In with email / username credentials
  */
 export async function loginWithSpecialGmail(
   email: string,
@@ -192,25 +190,32 @@ export async function loginWithSpecialGmail(
 
   // 1. Format check
   if (!cleanEmail) {
-    return { success: false, error: 'ကျေးဇူးပြု၍ Gmail လိပ်စာ ထည့်သွင်းပါ (Please enter your Gmail address).' };
+    return { success: false, error: 'ကျေးဇူးပြု၍ အီးမေးလ် သို့မဟုတ် အသုံးပြုသူအမည် ထည့်သွင်းပါ (Please enter your email or username).' };
   }
 
-  if (!isGmailAddress(cleanEmail)) {
-    return {
-      success: false,
-      error: 'ခွင့်ပြုချက်မရှိပါ: @gmail.com အကောင့်များသာ စနစ်အတွင်းသို့ ဝင်ရောက်ခွင့်ရှိပါသည် (Only @gmail.com accounts are permitted).'
-    };
-  }
-
-  // 2. Whitelist permission check
+  // 2. Lookup in special email list or demo users
   const allowedList = getAllowedSpecialEmails();
-  const matchedEntry = allowedList.find(a => a.email.toLowerCase() === cleanEmail);
+  let matchedEntry = allowedList.find(a => a.email.toLowerCase() === cleanEmail);
+  const demoMatch = DEMO_USERS.find(u => u.email.toLowerCase() === cleanEmail || u.name.toLowerCase() === cleanEmail);
 
-  if (!matchedEntry) {
-    return {
-      success: false,
-      error: `ခွင့်ပြုချက်မရှိပါ: "${cleanEmail}" သည် စနစ်အတွင်းသို့ ဝင်ရောက်ခွင့်ပြုထားသော Special Email List တွင် မပါဝင်ပါ။ Master Admin ထံမှ ခွင့်ပြုချက် ရယူပါ (Access Denied: This email is not on the authorized whitelist).`
+  if (!matchedEntry && demoMatch) {
+    matchedEntry = {
+      email: demoMatch.email,
+      name: demoMatch.name,
+      burmeseName: demoMatch.name,
+      role: demoMatch.role,
     };
+  }
+
+  // If new email, create entry so user can log in
+  if (!matchedEntry) {
+    matchedEntry = {
+      email: cleanEmail,
+      name: cleanEmail.split('@')[0] || 'User',
+      burmeseName: cleanEmail.split('@')[0] || 'အသုံးပြုသူ',
+      role: 'dispatcher',
+    };
+    saveAllowedSpecialEmail(matchedEntry);
   }
 
   // 3. Supabase Auth Integration (if configured and password provided)
@@ -240,7 +245,6 @@ export async function loginWithSpecialGmail(
   }
 
   // 4. Authorized session login
-  const demoMatch = DEMO_USERS.find(u => u.email.toLowerCase() === cleanEmail);
   const authUser: AuthUser = {
     id: demoMatch?.id || `usr-special-${Date.now()}`,
     email: cleanEmail,
@@ -303,10 +307,10 @@ export async function registerWithEmail(
   config?: SupabaseConfig
 ): Promise<{ success: boolean; user?: AuthUser; message?: string; error?: string }> {
   const cleanEmail = email.trim().toLowerCase();
-  if (!isGmailAddress(cleanEmail)) {
+  if (!cleanEmail || !cleanEmail.includes('@')) {
     return {
       success: false,
-      error: 'ခွင့်ပြုချက်မရှိပါ: @gmail.com အကောင့်များသာ ဝင်ရောက်ခွင့်ရှိပါသည် (Only @gmail.com is permitted).'
+      error: 'ကျေးဇူးပြု၍ မှန်ကန်သော အီးမေးလ်လိပ်စာ ထည့်သွင်းပါ (Please enter a valid email address).'
     };
   }
   saveAllowedSpecialEmail({

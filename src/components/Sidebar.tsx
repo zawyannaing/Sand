@@ -10,11 +10,11 @@ import {
   Settings,
   Sparkles,
   LogIn,
-  Package
+  Package,
+  ShieldCheck
 } from 'lucide-react';
 import { TabType, AuthUser } from '../types';
 import { DEFAULT_AVATAR } from '../data/mockData';
-import { GoogleGIcon } from './LoginModal';
 
 interface SidebarProps {
   currentTab: TabType;
@@ -157,8 +157,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-[13px] font-bold text-[#151c27] truncate group-hover:text-[#855300]">
                   {currentUser.name}
                 </span>
-                <span className="shrink-0" title="Gmail Verified">
-                  <GoogleGIcon className="w-3.5 h-3.5" />
+                <span className="shrink-0" title="Account Verified">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   {currentUser.roleLabel?.my || 'အသုံးပြုသူ'}
                 </span>
                 <span className="text-gray-300 shrink-0">•</span>
-                <span className="text-[10px] font-bold text-emerald-700 shrink-0">Gmail Auth</span>
+                <span className="text-[10px] font-bold text-emerald-700 shrink-0">Active</span>
               </div>
             </div>
           </div>

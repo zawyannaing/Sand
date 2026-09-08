@@ -22,7 +22,7 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { Trip, Driver, MaterialType, TabType, PaymentStatus, InventoryItem, CustomerOrderRequest } from '../types';
-import { MATERIAL_LABELS } from '../data/mockData';
+import { MATERIAL_LABELS, INVENTORY_CATEGORIES, getMaterialLabel } from '../data/mockData';
 
 interface DashboardViewProps {
   trips?: Trip[];
@@ -98,13 +98,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Payments & Debts
   const totalPaidRevenue = filteredTrips.reduce((acc, t) => {
     if (t.paymentStatus === 'paid') return acc + (t.totalAmount || 0);
+    if (t.paymentStatus === 'partial') return acc + (t.paidAmount || 0);
     return acc + (t.paidAmount || 0);
   }, 0);
 
   const totalOutstandingDebt = filteredTrips.reduce((acc, t) => {
-    if (t.paymentStatus === 'unpaid') return acc + (t.totalAmount || 0);
+    if (t.paymentStatus === 'paid') return acc;
+    if (t.paymentStatus === 'unpaid') return acc + (t.dueAmount !== undefined ? t.dueAmount : (t.totalAmount || 0));
     if (t.paymentStatus === 'partial') return acc + (t.dueAmount || 0);
-    return acc + (t.dueAmount || 0);
+    return acc;
   }, 0);
 
   const collectionRate = totalRevenue > 0 ? Math.round((totalPaidRevenue / totalRevenue) * 100) : 100;
@@ -315,7 +317,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {safeInventory.map((item) => {
-            const label = MATERIAL_LABELS[item.materialType];
+            const label = getMaterialLabel(item.materialType, safeInventory);
             const isLow = Number(item.currentStock) <= Number(item.minimumThreshold);
             const pct = Math.min(100, Math.round((Number(item.currentStock) / Number(item.capacity || 200)) * 100));
 
@@ -375,7 +377,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             ) : (
               inTransitTrips.map((trip) => {
-                const label = MATERIAL_LABELS[trip.materialType];
+                const label = getMaterialLabel(trip.materialType, safeInventory);
                 return (
                   <div 
                     key={trip.id}
@@ -453,7 +455,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             ) : (
               pendingOrders.map((ord) => {
-                const label = MATERIAL_LABELS[ord.materialType];
+                const label = getMaterialLabel(ord.materialType, safeInventory);
                 return (
                   <div 
                     key={ord.id}
@@ -540,7 +542,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
               {filteredTrips.slice(0, 8).map((trip) => {
-                const label = MATERIAL_LABELS[trip.materialType];
+                const label = getMaterialLabel(trip.materialType, safeInventory);
                 const isPaid = trip.paymentStatus === 'paid';
                 const isUnpaid = trip.paymentStatus === 'unpaid';
 
@@ -561,7 +563,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       {trip.destination}
                     </td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-[#151c27]">
-                      {trip.totalAmount?.toLocaleString()} MMK
+                      {(trip.totalAmount || 0).toLocaleString()} MMK
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${

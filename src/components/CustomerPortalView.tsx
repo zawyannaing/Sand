@@ -21,7 +21,7 @@ import {
   ShieldCheck
 } from 'lucide-react';
 import { Trip, MaterialType, CustomerOrderRequest, AuthUser } from '../types';
-import { MATERIAL_LABELS } from '../data/mockData';
+import { MATERIAL_LABELS, getMaterialLabel } from '../data/mockData';
 import { createCustomerOrder } from '../services/inventoryService';
 
 interface CustomerPortalViewProps {
@@ -295,7 +295,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {inTransitTrips.map((trip) => {
-              const label = MATERIAL_LABELS[trip.materialType];
+              const label = getMaterialLabel(trip.materialType);
               return (
                 <div 
                   key={trip.id}
@@ -403,7 +403,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
               </div>
             ) : (
               myOrders.map((ord) => {
-                const label = MATERIAL_LABELS[ord.materialType];
+                const label = getMaterialLabel(ord.materialType);
                 return (
                   <div key={ord.id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 flex items-center justify-between gap-3 text-xs">
                     <div className="min-w-0">
@@ -471,7 +471,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
                 </tr>
               ) : (
                 deliveredTrips.map((trip) => {
-                  const label = MATERIAL_LABELS[trip.materialType];
+                  const label = getMaterialLabel(trip.materialType);
                   const isPaid = trip.paymentStatus === 'paid';
                   const isUnpaid = trip.paymentStatus === 'unpaid';
 
@@ -485,7 +485,7 @@ export const CustomerPortalView: React.FC<CustomerPortalViewProps> = ({
                       <td className="py-3 px-4 font-mono font-extrabold text-gray-900">{trip.quantity} ကျင်း</td>
                       <td className="py-3 px-4 text-gray-600">{trip.driverName}</td>
                       <td className="py-3 px-4 text-right font-mono font-bold text-[#151c27]">
-                        {trip.totalAmount?.toLocaleString()} MMK
+                        {(trip.totalAmount || 0).toLocaleString()} MMK
                       </td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${

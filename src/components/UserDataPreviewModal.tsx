@@ -26,8 +26,7 @@ import {
 } from 'lucide-react';
 import { AuthUser, Trip, Driver, Vehicle, TabType, PaymentStatus } from '../types';
 import { ROLE_DETAILS } from '../services/authService';
-import { MATERIAL_LABELS } from '../data/mockData';
-import { GoogleGIcon } from './LoginModal';
+import { MATERIAL_LABELS, getMaterialLabel } from '../data/mockData';
 
 interface UserDataPreviewModalProps {
   isOpen: boolean;
@@ -103,11 +102,14 @@ export const UserDataPreviewModal: React.FC<UserDataPreviewModalProps> = ({
   const totalVolume = userTrips.reduce((acc, t) => acc + (Number(t.quantity) || 0), 0);
   const totalGrossAmount = userTrips.reduce((acc, t) => acc + (Number(t.totalAmount) || 0), 0);
   const totalDueAmount = userTrips.reduce((acc, t) => {
-    if (t.paymentStatus === 'unpaid') return acc + (t.totalAmount || 0);
-    return acc + (t.dueAmount || 0);
+    if (t.paymentStatus === 'paid') return acc;
+    if (t.paymentStatus === 'unpaid') return acc + (t.dueAmount !== undefined ? t.dueAmount : (t.totalAmount || 0));
+    if (t.paymentStatus === 'partial') return acc + (t.dueAmount || 0);
+    return acc;
   }, 0);
   const totalPaidAmount = userTrips.reduce((acc, t) => {
     if (t.paymentStatus === 'paid') return acc + (t.totalAmount || 0);
+    if (t.paymentStatus === 'partial') return acc + (t.paidAmount || 0);
     return acc + (t.paidAmount || 0);
   }, 0);
 
@@ -162,11 +164,11 @@ export const UserDataPreviewModal: React.FC<UserDataPreviewModalProps> = ({
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-xs text-gray-300 font-mono flex items-center gap-1.5">
-                    <GoogleGIcon className="w-3.5 h-3.5" />
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     <span>{user.email}</span>
                   </p>
                   <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/20 border border-emerald-400/30 px-2 py-0.2 rounded-full">
-                    ✓ Gmail Authorized
+                    ✓ Account Verified
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-[11px] text-amber-300 mt-1">
