@@ -3,16 +3,17 @@ import { Truck, Layers, Plus, X, Wrench, CheckCircle2, Trash2, AlertTriangle, Se
 import { Vehicle } from '../types';
 
 interface VehiclesViewProps {
-  vehicles: Vehicle[];
+  vehicles?: Vehicle[];
   onAddVehicle: (vehicle: Omit<Vehicle, 'id' | 'todayTrips' | 'totalTrips'>) => void;
   onDeleteVehicle: (vehicleId: string) => void;
 }
 
 export const VehiclesView: React.FC<VehiclesViewProps> = ({ 
-  vehicles, 
+  vehicles = [], 
   onAddVehicle,
   onDeleteVehicle
 }) => {
+  const safeVehicles = vehicles || [];
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'in_transit' | 'maintenance'>('all');
@@ -24,24 +25,24 @@ export const VehiclesView: React.FC<VehiclesViewProps> = ({
 
   // Total Fleet Metrics
   const totalTodayTrips = useMemo(() => {
-    return vehicles.reduce((sum, v) => sum + (v.todayTrips || 0), 0);
-  }, [vehicles]);
+    return safeVehicles.reduce((sum, v) => sum + (v.todayTrips || 0), 0);
+  }, [safeVehicles]);
 
   const totalDispatches = useMemo(() => {
-    return vehicles.reduce((sum, v) => sum + (v.totalTrips || 0), 0);
-  }, [vehicles]);
+    return safeVehicles.reduce((sum, v) => sum + (v.totalTrips || 0), 0);
+  }, [safeVehicles]);
 
   const inTransitCount = useMemo(() => {
-    return vehicles.filter(v => v.status === 'in_transit').length;
-  }, [vehicles]);
+    return safeVehicles.filter(v => v.status === 'in_transit').length;
+  }, [safeVehicles]);
 
   const activeCount = useMemo(() => {
-    return vehicles.filter(v => v.status === 'active').length;
-  }, [vehicles]);
+    return safeVehicles.filter(v => v.status === 'active').length;
+  }, [safeVehicles]);
 
   // Filtered vehicles based on search plate / driver and status
   const filteredVehicles = useMemo(() => {
-    return vehicles.filter(v => {
+    return safeVehicles.filter(v => {
       const matchesSearch = 
         !searchTerm.trim() ||
         v.plateNumber.toLowerCase().includes(searchTerm.trim().toLowerCase()) ||

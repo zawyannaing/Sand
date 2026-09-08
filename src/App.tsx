@@ -102,14 +102,24 @@ import { ReportsView } from './components/ReportsView';
 import { DriversView } from './components/DriversView';
 import { VehiclesView } from './components/VehiclesView';
 import { SettingsView } from './components/SettingsView';
+import { InventoryView } from './components/InventoryView';
+import { CustomerPortalView } from './components/CustomerPortalView';
 import { ReceiptModal } from './components/ReceiptModal';
 import { NotificationModal } from './components/NotificationModal';
 import { SupabaseIntegrationModal } from './components/SupabaseIntegrationModal';
 import { LoginModal } from './components/LoginModal';
 import { LoginPage } from './components/LoginPage';
 import { UserDataPreviewModal } from './components/UserDataPreviewModal';
-import { AuthUser, RealtimeUpdateEvent } from './types';
+import { AuthUser, RealtimeUpdateEvent, InventoryItem, StockLog, CustomerOrderRequest } from './types';
 import { getCurrentUser, setCurrentUser, logoutUser } from './services/authService';
+import { 
+  getStoredInventory, 
+  getStoredStockLogs, 
+  getStoredCustomerOrders, 
+  deductStockForTrip, 
+  refundStockForTrip, 
+  updateCustomerOrderStatus 
+} from './services/inventoryService';
 import { 
   syncTripSave, 
   syncTripDelete, 
@@ -198,6 +208,17 @@ export default function App() {
   // Modal states
   const [receiptTrip, setReceiptTrip] = useState<Trip | null>(null);
   const [showNotifications, setShowNotifications] = useState(false);
+
+  // Persisted Stock Inventory & Customer Orders State
+  const [inventory, setInventory] = useState<InventoryItem[]>(() => getStoredInventory());
+  const [stockLogs, setStockLogs] = useState<StockLog[]>(() => getStoredStockLogs());
+  const [customerOrders, setCustomerOrders] = useState<CustomerOrderRequest[]>(() => getStoredCustomerOrders());
+
+  const refreshInventoryState = () => {
+    setInventory(getStoredInventory());
+    setStockLogs(getStoredStockLogs());
+    setCustomerOrders(getStoredCustomerOrders());
+  };
 
   // Sync to localStorage
   useEffect(() => {
@@ -387,6 +408,16 @@ export default function App() {
 
     setTrips(prev => [newTrip, ...prev]);
 
+    // Inventory Deduction Logic (Auto-updates stock and logs movement)
+    deductStockForTrip({
+      materialType: newTrip.materialType,
+      quantity: newTrip.quantity,
+      tripId: newTrip.tripNumber,
+      destination: newTrip.destination,
+      performedBy: currentUser?.name || newTrip.driverName || 'Dispatcher',
+    });
+    refreshInventoryState();
+
     // Auto-sync wrapper (direct if online, offline queue if offline)
     if (settings.autoSyncSupabase !== false) {
       syncTripSave(newTrip, settings).catch(err => {
@@ -432,6 +463,11 @@ export default function App() {
 
   // Delete Trip (instantly updates UI & auto-syncs deletion to Supabase or offline queue)
   const handleDeleteTrip = (tripId: string) => {
+    const deletedTrip = trips.find(t => t.id === tripId);
+    if (deletedTrip) {
+      refundStockForTrip(deletedTrip.materialType, deletedTrip.quantity, deletedTrip.tripNumber);
+      refreshInventoryState();
+    }
     setTrips(prev => prev.filter(t => t.id !== tripId));
     if (settings.autoSyncSupabase !== false) {
       syncTripDelete(tripId, settings);
@@ -559,6 +595,7 @@ export default function App() {
               onSaveTrip={handleSaveTrip}
               drivers={drivers}
               settings={settings}
+              inventory={inventory}
               onCancel={() => setCurrentTab('dashboard')}
               onViewReceipt={(trip) => setReceiptTrip(trip)}
               nextTripId={computeNextTripId()}
@@ -569,11 +606,40 @@ export default function App() {
             <DashboardView
               trips={trips}
               drivers={drivers}
+              inventory={inventory}
+              customerOrders={customerOrders}
               onSelectTab={setCurrentTab}
               onViewReceipt={(trip) => setReceiptTrip(trip)}
               onUpdateTripStatus={handleUpdateTripStatus}
               onDeleteTrip={handleDeleteTrip}
               onUpdateTripPayment={handleUpdateTripPayment}
+              onQuickDispatchOrder={(ord) => {
+                updateCustomerOrderStatus(ord.id, 'dispatched');
+                refreshInventoryState();
+                setCurrentTab('add-trip');
+              }}
+            />
+          )}
+
+          {currentTab === 'inventory' && (
+            <InventoryView
+              inventory={inventory}
+              stockLogs={stockLogs}
+              logs={stockLogs}
+              onRefresh={refreshInventoryState}
+              onNavigateToDispatch={() => setCurrentTab('add-trip')}
+              onQuickDispatch={() => setCurrentTab('add-trip')}
+              userName={currentUser?.name || 'Admin'}
+            />
+          )}
+
+          {currentTab === 'customer-portal' && (
+            <CustomerPortalView
+              trips={trips}
+              customerOrders={customerOrders}
+              currentUser={currentUser}
+              onRefreshOrders={refreshInventoryState}
+              onViewReceipt={(trip) => setReceiptTrip(trip)}
             />
           )}
 

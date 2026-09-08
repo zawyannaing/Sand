@@ -1,12 +1,68 @@
-export type TabType = 'dashboard' | 'add-trip' | 'history' | 'site-billing' | 'reports' | 'drivers' | 'vehicles' | 'settings';
+export type TabType = 
+  | 'dashboard' 
+  | 'inventory' 
+  | 'customer-portal'
+  | 'add-trip' 
+  | 'history' 
+  | 'site-billing' 
+  | 'reports' 
+  | 'drivers' 
+  | 'vehicles' 
+  | 'settings';
 
-export type MaterialType = 'sand' | 'soil' | 'stone' | 'gravel';
+export type MaterialType = 'sand' | 'soil' | 'stone' | 'gravel' | (string & {});
 
 export type TripStatus = 'loading' | 'on_the_way' | 'delivered' | 'cancelled';
 
 export type PaymentStatus = 'paid' | 'unpaid' | 'partial';
 
 export type UserRole = 'admin' | 'dispatcher' | 'driver' | 'site_manager' | 'viewer';
+
+export interface InventoryItem {
+  id: string;
+  materialType: MaterialType;
+  name: string;
+  burmeseName: string;
+  category?: string; // 'aggregates' | 'cement_brick' | 'earthwork' | 'steel' | 'other' | string
+  unit: string; // 'ကျင်း', 'အိတ်', 'ချောင်း', 'ချပ်', 'တန်', 'ကား', etc.
+  currentStock: number;
+  minimumThreshold: number;
+  capacity: number;
+  purchaseCostPerUnit: number; // in MMK
+  sellingPricePerUnit: number; // in MMK
+  location: string;
+  lastRestocked: string;
+  color?: string;
+  bgColor?: string;
+}
+
+export interface StockLog {
+  id: string;
+  inventoryItemId: string;
+  materialType: MaterialType;
+  type: 'in' | 'out' | 'adjust'; // 'in' = Intake, 'out' = Delivery/Dispatch, 'adjust' = Physical count correction
+  quantity: number; // in Kyin
+  unitPrice?: number;
+  totalCost?: number;
+  referenceTripId?: string;
+  supplierName?: string;
+  notes?: string;
+  date: string;
+  performedBy: string;
+}
+
+export interface CustomerOrderRequest {
+  id: string;
+  customerName: string;
+  siteName: string;
+  phone: string;
+  materialType: MaterialType;
+  quantity: number;
+  preferredDate: string;
+  notes?: string;
+  status: 'pending' | 'dispatched' | 'completed' | 'cancelled';
+  createdAt: string;
+}
 
 export interface AuthUser {
   id: string;

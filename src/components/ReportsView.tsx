@@ -10,25 +10,27 @@ import {
 import { Trip, Driver } from '../types';
 
 interface ReportsViewProps {
-  trips: Trip[];
-  drivers: Driver[];
+  trips?: Trip[];
+  drivers?: Driver[];
 }
 
-export const ReportsView: React.FC<ReportsViewProps> = ({ trips, drivers }) => {
-  const totalVolume = trips.reduce((acc, t) => acc + (t.quantity || 0), 0);
-  const totalRevenue = trips.reduce((acc, t) => acc + (t.totalAmount || 0), 0);
+export const ReportsView: React.FC<ReportsViewProps> = ({ trips = [], drivers = [] }) => {
+  const safeTrips = trips || [];
+  const safeDrivers = drivers || [];
+  const totalVolume = safeTrips.reduce((acc, t) => acc + (t.quantity || 0), 0);
+  const totalRevenue = safeTrips.reduce((acc, t) => acc + (t.totalAmount || 0), 0);
 
   // Group by material
   const materialTotals = {
-    sand: trips.filter(t => t.materialType === 'sand').reduce((a, b) => a + b.quantity, 0),
-    soil: trips.filter(t => t.materialType === 'soil').reduce((a, b) => a + b.quantity, 0),
-    stone: trips.filter(t => t.materialType === 'stone').reduce((a, b) => a + b.quantity, 0),
-    gravel: trips.filter(t => t.materialType === 'gravel').reduce((a, b) => a + b.quantity, 0),
+    sand: safeTrips.filter(t => t.materialType === 'sand').reduce((a, b) => a + b.quantity, 0),
+    soil: safeTrips.filter(t => t.materialType === 'soil').reduce((a, b) => a + b.quantity, 0),
+    stone: safeTrips.filter(t => t.materialType === 'stone').reduce((a, b) => a + b.quantity, 0),
+    gravel: safeTrips.filter(t => t.materialType === 'gravel').reduce((a, b) => a + b.quantity, 0),
   };
 
   // Driver performance rankings
-  const driverPerformance = drivers.map(drv => {
-    const drvTrips = trips.filter(t => t.driverName === drv.burmeseName || t.driverName === drv.name);
+  const driverPerformance = safeDrivers.map(drv => {
+    const drvTrips = safeTrips.filter(t => t.driverName === drv.burmeseName || t.driverName === drv.name);
     const volume = drvTrips.reduce((acc, t) => acc + t.quantity, 0);
     const count = drvTrips.length;
     return {

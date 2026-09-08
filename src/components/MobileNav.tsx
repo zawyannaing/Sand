@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, PlusCircle, History, Building2, Settings } from 'lucide-react';
+import { LayoutDashboard, PlusCircle, History, Building2, Package, Settings } from 'lucide-react';
 import { TabType } from '../types';
 
 interface MobileNavProps {
@@ -10,15 +10,34 @@ interface MobileNavProps {
 
 export const MobileNav: React.FC<MobileNavProps> = ({ 
   currentTab, 
-  onSelectTab,
+  onSelectTab, 
   pendingTripsCount = 0 
 }) => {
   const navItems = [
     {
       id: 'dashboard' as TabType,
-      label: 'ပင်မ (Home)',
-      sub: 'Dashboard',
+      label: 'ပင်မ',
+      sub: 'Home',
       icon: LayoutDashboard,
+    },
+    {
+      id: 'inventory' as TabType,
+      label: 'စတို',
+      sub: 'Stock',
+      icon: Package,
+    },
+    {
+      id: 'add-trip' as TabType,
+      label: 'ကားလွှတ်',
+      sub: 'Dispatch',
+      icon: PlusCircle,
+      isPrimary: true,
+    },
+    {
+      id: 'customer-portal' as TabType,
+      label: 'ဆိုဒ်ဘုတ်',
+      sub: 'Portal',
+      icon: Building2,
     },
     {
       id: 'history' as TabType,
@@ -26,25 +45,6 @@ export const MobileNav: React.FC<MobileNavProps> = ({
       sub: 'History',
       icon: History,
       badge: pendingTripsCount > 0 ? pendingTripsCount : undefined,
-    },
-    {
-      id: 'add-trip' as TabType,
-      label: 'စာရင်းသွင်း',
-      sub: 'Add Trip',
-      icon: PlusCircle,
-      isPrimary: true,
-    },
-    {
-      id: 'site-billing' as TabType,
-      label: 'ဆိုက်ဘေလ်',
-      sub: 'Site Bill',
-      icon: Building2,
-    },
-    {
-      id: 'settings' as TabType,
-      label: 'ဆက်တင်',
-      sub: 'Settings',
-      icon: Settings,
     },
   ];
 

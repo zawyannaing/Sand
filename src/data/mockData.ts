@@ -1,4 +1,4 @@
-import { Trip, Driver, Vehicle, AppSettings, MaterialType, AuthUser } from '../types';
+import { Trip, Driver, Vehicle, AppSettings, MaterialType, AuthUser, InventoryItem, StockLog, CustomerOrderRequest } from '../types';
 
 export const DEFAULT_AVATAR = 'https://lh3.googleusercontent.com/aida-public/AB6AXuCyiZRyVbcw42pgG-ZUOJQuO7l8yg_hBY3BR98k4QENjcqWgLUmGGcuPEwJShX2V4YtNc-1zRLHg2UHM2kV42zEcJd3p7N_N0naJChHhj_itWNXvYW-cPgpxot5L4aky5t800yJlctf0rTGYqypSJfK-le5bWMXqrDD6bSr4g1z6QjjuJmXlMIkdBCeJskW7PsV4VzLwx-pyiqdRxO6UtK3qpHXc4VoEr_Sb7MZKRGOpi3V4Hl-m6Of';
 
@@ -312,7 +312,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   autoSyncSupabase: true,
 };
 
-export const MATERIAL_LABELS: Record<MaterialType, { en: string; my: string; color: string; bg: string }> = {
+export const INVENTORY_CATEGORIES = [
+  { id: 'all', label: { en: 'All Products', my: 'ပစ္စည်း အားလုံး' } },
+  { id: 'aggregates', label: { en: 'Aggregates & Sand', my: 'သဲနှင့် ကျောက်' } },
+  { id: 'earthwork', label: { en: 'Earth & Fill Soil', my: 'မြေနီ / ဖို့မြေ' } },
+  { id: 'cement_brick', label: { en: 'Cement & Brick', my: 'ဘိလပ်မြေနှင့် အုတ်' } },
+  { id: 'steel', label: { en: 'Steel & Rebar', my: 'သံချောင်း / သံထည်' } },
+  { id: 'other', label: { en: 'General / Custom', my: 'အခြား စတိုပစ္စည်း' } },
+] as const;
+
+export const MATERIAL_LABELS: Record<string, { en: string; my: string; color: string; bg: string }> = {
   sand: {
     en: 'Sand',
     my: 'သဲ',
@@ -337,4 +346,244 @@ export const MATERIAL_LABELS: Record<MaterialType, { en: string; my: string; col
     color: '#00408f',
     bg: '#8ab0ff',
   },
+  cement: {
+    en: 'Cement',
+    my: 'ဘိလပ်မြေ',
+    color: '#0d9488',
+    bg: '#ccfbf1',
+  },
+  brick: {
+    en: 'Brick',
+    my: 'အုတ်နီခဲ',
+    color: '#b91c1c',
+    bg: '#fee2e2',
+  },
+  steel: {
+    en: 'Steel Rebar',
+    my: 'သံချောင်း',
+    color: '#475569',
+    bg: '#e2e8f0',
+  },
 };
+
+export function getMaterialLabel(material: string, inventory?: InventoryItem[]): { en: string; my: string; color: string; bg: string } {
+  if (MATERIAL_LABELS[material]) {
+    return MATERIAL_LABELS[material];
+  }
+  const item = inventory?.find(i => i.materialType === material || i.id === material || i.name.toLowerCase() === material.toLowerCase());
+  if (item) {
+    return {
+      en: item.name,
+      my: item.burmeseName,
+      color: item.color || '#855300',
+      bg: item.bgColor || '#ffddb8',
+    };
+  }
+  return {
+    en: material,
+    my: material,
+    color: '#534434',
+    bg: '#fdf9f4',
+  };
+}
+
+export const INITIAL_INVENTORY: InventoryItem[] = [
+  {
+    id: 'inv-sand-1',
+    materialType: 'sand',
+    name: 'River Sand (Grade A)',
+    burmeseName: 'ဧရာဝတီ မြစ်သဲ (အသန့်)',
+    category: 'aggregates',
+    unit: 'ကျင်း',
+    currentStock: 185,
+    minimumThreshold: 50,
+    capacity: 400,
+    purchaseCostPerUnit: 28000,
+    sellingPricePerUnit: 45000,
+    location: 'လှိုင်သာယာ ဘုရင့်နောင် ဂိတ်ဝင်း',
+    lastRestocked: new Date(Date.now() - 14 * 3600000).toISOString(),
+    color: '#855300',
+    bgColor: '#ffddb8',
+  },
+  {
+    id: 'inv-stone-1',
+    materialType: 'stone',
+    name: '3/4 Crushed Stone',
+    burmeseName: 'သုံးမတ် ကျောက်စရစ်ခွဲခြမ်း',
+    category: 'aggregates',
+    unit: 'ကျင်း',
+    currentStock: 120,
+    minimumThreshold: 40,
+    capacity: 300,
+    purchaseCostPerUnit: 36000,
+    sellingPricePerUnit: 55000,
+    location: 'သန်လျင် ကျောက်ကွင်း စတို',
+    lastRestocked: new Date(Date.now() - 28 * 3600000).toISOString(),
+    color: '#3f465c',
+    bgColor: '#dae2fd',
+  },
+  {
+    id: 'inv-gravel-1',
+    materialType: 'gravel',
+    name: 'Pea Gravel / Ballast',
+    burmeseName: 'ကျောက်စရစ်လုံးကြီး',
+    category: 'aggregates',
+    unit: 'ကျင်း',
+    currentStock: 35, // Low stock on purpose to trigger warning!
+    minimumThreshold: 50,
+    capacity: 250,
+    purchaseCostPerUnit: 32000,
+    sellingPricePerUnit: 50000,
+    location: 'ဒဂုံဆိပ်ကမ်း ကမ်းနားဝင်း',
+    lastRestocked: new Date(Date.now() - 72 * 3600000).toISOString(),
+    color: '#00408f',
+    bgColor: '#8ab0ff',
+  },
+  {
+    id: 'inv-soil-1',
+    materialType: 'soil',
+    name: 'Red Filling Soil',
+    burmeseName: 'မြေနီ အဆောက်အဦဖို့မြေ',
+    category: 'earthwork',
+    unit: 'ကျင်း',
+    currentStock: 95,
+    minimumThreshold: 30,
+    capacity: 200,
+    purchaseCostPerUnit: 20000,
+    sellingPricePerUnit: 35000,
+    location: 'မှော်ဘီ ကွင်းဆင်း စတို',
+    lastRestocked: new Date(Date.now() - 48 * 3600000).toISOString(),
+    color: '#653e00',
+    bgColor: '#e7eefe',
+  },
+  {
+    id: 'inv-cement-1',
+    materialType: 'cement',
+    name: 'Elephant Brand Cement (Portland)',
+    burmeseName: 'ဆင်တံဆိပ် ဘိလပ်မြေ (အိတ်)',
+    category: 'cement_brick',
+    unit: 'အိတ်',
+    currentStock: 450,
+    minimumThreshold: 100,
+    capacity: 1200,
+    purchaseCostPerUnit: 9200,
+    sellingPricePerUnit: 11500,
+    location: 'လှိုင်သာယာ မိုးလုံလေလုံ စတိုရုံ (Bay 2)',
+    lastRestocked: new Date(Date.now() - 20 * 3600000).toISOString(),
+    color: '#0d9488',
+    bgColor: '#ccfbf1',
+  },
+  {
+    id: 'inv-brick-1',
+    materialType: 'brick',
+    name: 'Solid Red Burnt Clay Brick',
+    burmeseName: 'မီးဖုတ် အုတ်နီခဲ အခဲ (အကောင်းစား)',
+    category: 'cement_brick',
+    unit: 'ချပ်',
+    currentStock: 12500,
+    minimumThreshold: 3000,
+    capacity: 35000,
+    purchaseCostPerUnit: 190,
+    sellingPricePerUnit: 250,
+    location: 'မှော်ဘီ အုတ်ကွင်း သိုလှောင်ရုံ',
+    lastRestocked: new Date(Date.now() - 36 * 3600000).toISOString(),
+    color: '#b91c1c',
+    bgColor: '#fee2e2',
+  },
+  {
+    id: 'inv-steel-1',
+    materialType: 'steel',
+    name: 'Deformed Steel Rebar 12mm',
+    burmeseName: 'သံမဏိ သံချောင်း (၁၂ မမ)',
+    category: 'steel',
+    unit: 'ချောင်း',
+    currentStock: 600,
+    minimumThreshold: 150,
+    capacity: 2000,
+    purchaseCostPerUnit: 24000,
+    sellingPricePerUnit: 29500,
+    location: 'ဘုရင့်နောင် သံမဏိ ကုန်တိုက် စတို',
+    lastRestocked: new Date(Date.now() - 10 * 3600000).toISOString(),
+    color: '#475569',
+    bgColor: '#e2e8f0',
+  },
+];
+
+export const INITIAL_STOCK_LOGS: StockLog[] = [
+  {
+    id: 'log-1',
+    inventoryItemId: 'inv-sand-1',
+    materialType: 'sand',
+    type: 'in',
+    quantity: 100,
+    unitPrice: 28000,
+    totalCost: 2800000,
+    supplierName: 'ဧရာဝတီ သောင်တူးလုပ်ငန်းစု',
+    notes: 'စက်လှေကြီး ၅ စင်းဆိုက်ရောက် ရေချိုမြစ်သဲ သွင်းယူခြင်း',
+    date: new Date(Date.now() - 14 * 3600000).toISOString(),
+    performedBy: 'ဦးတင့်လွင် (ဂိတ်မှူး)',
+  },
+  {
+    id: 'log-2',
+    inventoryItemId: 'inv-stone-1',
+    materialType: 'stone',
+    type: 'in',
+    quantity: 80,
+    unitPrice: 36000,
+    totalCost: 2880000,
+    supplierName: 'သထုံ ကျောက်ထုတ်လုပ်ရေး',
+    notes: 'တွဲကား ၄ စီး ကုန်ဆင်းထားရှိမှု',
+    date: new Date(Date.now() - 28 * 3600000).toISOString(),
+    performedBy: 'ကိုဇော်ယန်နိုင်',
+  },
+  {
+    id: 'log-3',
+    inventoryItemId: 'inv-sand-1',
+    materialType: 'sand',
+    type: 'out',
+    quantity: 15,
+    referenceTripId: 'trip-083',
+    notes: 'TRK-083 လှိုင်သာယာ စက်မှုဇုန်သို့ သယ်ယူခွင့်ပြုခြင်း',
+    date: new Date(Date.now() - 35 * 60000).toISOString(),
+    performedBy: 'System Auto-Dispatch',
+  },
+  {
+    id: 'log-4',
+    inventoryItemId: 'inv-stone-1',
+    materialType: 'stone',
+    type: 'out',
+    quantity: 20,
+    referenceTripId: 'trip-082',
+    notes: 'TRK-082 ဒဂုံ ၄၂ ရပ်ကွက်သို့ ပို့ဆောင်',
+    date: new Date(Date.now() - 90 * 60000).toISOString(),
+    performedBy: 'System Auto-Dispatch',
+  },
+];
+
+export const INITIAL_CUSTOMER_ORDERS: CustomerOrderRequest[] = [
+  {
+    id: 'ord-101',
+    customerName: 'ရွှေနဂါး ဆောက်လုပ်ရေး',
+    siteName: 'ရွှေနဂါး - လှိုင်သာယာ စက်မှုဇုန် ၃',
+    phone: '09-970987654',
+    materialType: 'sand',
+    quantity: 30,
+    preferredDate: '2026-09-08',
+    notes: 'ကွန်ကရစ်ဖျော်ရန် မြစ်သဲ အသန့် အမြန်လိုပါသည်။ မနက် ၉ နာရီအရောက်ပို့ပေးပါ',
+    status: 'pending',
+    createdAt: new Date(Date.now() - 40 * 60000).toISOString(),
+  },
+  {
+    id: 'ord-102',
+    customerName: 'Asia World Logistics',
+    siteName: 'သန်လျင်တံတား ချဉ်းကပ်လမ်းစီမံကိန်း',
+    phone: '09-420112233',
+    materialType: 'stone',
+    quantity: 40,
+    preferredDate: '2026-09-09',
+    notes: 'လမ်းခင်းကျောက် 3/4',
+    status: 'dispatched',
+    createdAt: new Date(Date.now() - 180 * 60000).toISOString(),
+  }
+];
+

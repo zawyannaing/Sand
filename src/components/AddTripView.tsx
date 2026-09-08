@@ -24,12 +24,13 @@ import {
   Calendar,
   AlertTriangle
 } from 'lucide-react';
-import { Trip, Driver, MaterialType, AppSettings, PaymentStatus } from '../types';
+import { Trip, Driver, MaterialType, AppSettings, PaymentStatus, InventoryItem } from '../types';
 
 interface AddTripViewProps {
   onSaveTrip: (trip: Omit<Trip, 'id'>) => Trip;
   drivers: Driver[];
   settings: AppSettings;
+  inventory?: InventoryItem[];
   onCancel?: () => void;
   onViewReceipt: (trip: Trip) => void;
   nextTripId: string;
@@ -39,15 +40,21 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
   onSaveTrip,
   drivers,
   settings,
+  inventory = [],
   onCancel,
   onViewReceipt,
   nextTripId,
 }) => {
+  const [materialType, setMaterialType] = useState<MaterialType>('sand');
+  const selectedInventoryItem = (inventory || []).find(
+    i => i.materialType === materialType || i.id === materialType || i.name.toLowerCase() === String(materialType).toLowerCase()
+  );
+  const currentUnit = selectedInventoryItem?.unit || 'ကျင်း';
+  const currentBurmeseName = selectedInventoryItem?.burmeseName || (materialType === 'sand' ? 'သဲ' : materialType === 'soil' ? 'မြေကြီး' : materialType === 'stone' ? 'ကျောက်' : 'ကျောက်စရစ်');
   const [driverName, setDriverName] = useState(drivers[0]?.burmeseName || 'ဦးဘမောင်');
   const [licensePlate, setLicensePlate] = useState(drivers[0]?.licensePlate || '9ယ/12345');
   const [quantity, setQuantity] = useState<number>(1);
   const [showDetails, setShowDetails] = useState(true);
-  const [materialType, setMaterialType] = useState<MaterialType>('sand');
   const [destination, setDestination] = useState('လှိုင်သာယာ စက်မှုဇုန် (Site A)');
   const [phone, setPhone] = useState(drivers[0]?.phone || '09-450012345');
   const [customerName, setCustomerName] = useState('ရွှေနဂါး ဆောက်လုပ်ရေး');
@@ -269,16 +276,16 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
             </div>
           </div>
 
-          {/* Sand Quantity (ကျင်း) Section - Mobile Optimized */}
+          {/* Quantity Section - Dynamic Unit & Material */}
           <div className="flex flex-col gap-3.5 bg-[#f0f3ff] p-4 sm:p-5 rounded-2xl border border-[#d8c3ad]/70">
             <div className="flex items-center justify-between">
               <label className="text-sm font-bold text-[#151c27] flex items-center gap-1.5">
                 <Layers className="w-4 h-4 text-[#855300]" />
-                <span>သဲအရေအတွက် / ပမာဏ (Quantity in Kyin)</span>
+                <span>{currentBurmeseName} အရေအတွက် / ပမာဏ (Quantity in {currentUnit})</span>
                 <span className="text-red-500">*</span>
               </label>
               <span className="text-[11px] font-semibold text-[#855300] bg-white px-2.5 py-1 rounded-md border border-[#d8c3ad] shadow-xs">
-                ၁ ကျင်း = ၁၀၀ ကုဗပေ
+                {currentUnit === 'ကျင်း' ? '၁ ကျင်း = ၁၀၀ ကုဗပေ' : `၁ ${currentUnit} အခြေခံတွက်ချက်`}
               </span>
             </div>
 
@@ -291,7 +298,7 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
                   setErrorMessage(null);
                 }}
                 className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-white hover:bg-[#e7eefe] active:scale-95 border-2 border-[#d8c3ad] text-[#855300] flex items-center justify-center font-extrabold text-xl shadow-xs transition-all cursor-pointer shrink-0"
-                title="Decrease 1 Kyin"
+                title={`Decrease 1 ${currentUnit}`}
               >
                 <Minus className="w-6 h-6 stroke-[2.5]" />
               </button>
@@ -310,7 +317,7 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
                   required
                 />
                 <span className="absolute right-3 sm:right-4 font-bold text-sm sm:text-base text-[#534434] pointer-events-none">
-                  ကျင်း
+                  {currentUnit}
                 </span>
               </div>
 
@@ -321,7 +328,7 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
                   setErrorMessage(null);
                 }}
                 className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl bg-[#855300] hover:bg-[#653e00] active:scale-95 text-white flex items-center justify-center font-extrabold text-xl shadow-xs transition-all cursor-pointer shrink-0"
-                title="Increase 1 Kyin"
+                title={`Increase 1 ${currentUnit}`}
               >
                 <Plus className="w-6 h-6 stroke-[2.5]" />
               </button>
@@ -371,30 +378,42 @@ export const AddTripView: React.FC<AddTripViewProps> = ({
               <div className="p-5 flex flex-col gap-4 bg-white animate-fade-in">
                 {/* Material Selection */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-semibold text-[#534434]">
-                    သယ်ယူမည့် ပစ္စည်းအမျိုးအစား (Material Type)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[#534434]">
+                      သယ်ယူမည့် ပစ္စည်းအမျိုးအစား (Material / Store Product)
+                    </label>
+                    <span className="text-[11px] text-[#855300] font-medium">
+                      {selectedInventoryItem ? `စတိုလက်ကျန်: ${selectedInventoryItem.currentStock} ${currentUnit}` : ''}
+                    </span>
+                  </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {(['sand', 'soil', 'stone', 'gravel'] as MaterialType[]).map((mat) => {
-                      const labels: Record<MaterialType, { en: string; my: string }> = {
-                        sand: { en: 'Sand', my: 'သဲ' },
-                        soil: { en: 'Soil', my: 'မြေကြီး' },
-                        stone: { en: 'Stone', my: 'ကျောက်' },
-                        gravel: { en: 'Gravel', my: 'ကျောက်စရစ်' },
-                      };
-                      const active = materialType === mat;
+                    {((inventory && inventory.length > 0) ? inventory : [
+                      { id: '1', materialType: 'sand', name: 'Sand', burmeseName: 'သဲ', unit: 'ကျင်း', sellingPricePerUnit: 45000, currentStock: 150 },
+                      { id: '2', materialType: 'soil', name: 'Soil', burmeseName: 'မြေကြီး', unit: 'ကျင်း', sellingPricePerUnit: 35000, currentStock: 80 },
+                      { id: '3', materialType: 'stone', name: 'Stone', burmeseName: 'ကျောက်', unit: 'ကျင်း', sellingPricePerUnit: 55000, currentStock: 120 },
+                      { id: '4', materialType: 'gravel', name: 'Gravel', burmeseName: 'ကျောက်စရစ်', unit: 'ကျင်း', sellingPricePerUnit: 50000, currentStock: 95 },
+                    ]).map((item) => {
+                      const active = materialType === item.materialType;
                       return (
                         <button
-                          key={mat}
+                          key={item.id}
                           type="button"
-                          onClick={() => setMaterialType(mat)}
-                          className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all ${
+                          onClick={() => {
+                            setMaterialType(item.materialType);
+                            if (item.sellingPricePerUnit) {
+                              setUnitPrice(item.sellingPricePerUnit);
+                            }
+                          }}
+                          className={`py-2 px-3 rounded-lg border text-xs font-bold transition-all text-left flex flex-col justify-between ${
                             active
                               ? 'bg-[#855300] text-white border-[#855300] shadow-xs'
                               : 'bg-[#f9f9ff] text-[#534434] border-[#d8c3ad] hover:bg-[#f0f3ff]'
                           }`}
                         >
-                          {labels[mat].en} ({labels[mat].my})
+                          <span className="font-extrabold truncate">{item.burmeseName}</span>
+                          <span className={`text-[10px] font-normal truncate ${active ? 'text-amber-100' : 'text-gray-400'}`}>
+                            {item.name} ({item.unit || 'ကျင်း'})
+                          </span>
                         </button>
                       );
                     })}

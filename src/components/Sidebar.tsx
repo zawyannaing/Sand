@@ -9,7 +9,8 @@ import {
   Truck, 
   Settings,
   Sparkles,
-  LogIn
+  LogIn,
+  Package
 } from 'lucide-react';
 import { TabType, AuthUser } from '../types';
 import { DEFAULT_AVATAR } from '../data/mockData';
@@ -33,13 +34,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenLogin,
 }) => {
   const navItems = [
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'add-trip' as TabType, label: 'Add Trip', icon: PlusCircle, badge: null },
-    { id: 'history' as TabType, label: 'History', icon: History },
-    { id: 'site-billing' as TabType, label: 'Site Billing', icon: Building2 },
-    { id: 'reports' as TabType, label: 'Reports', icon: BarChart3 },
-    { id: 'drivers' as TabType, label: 'Drivers', icon: Users },
-    { id: 'vehicles' as TabType, label: 'Vehicles', icon: Truck },
+    { id: 'dashboard' as TabType, label: 'Dashboard', sub: 'ပင်မ', icon: LayoutDashboard },
+    { id: 'inventory' as TabType, label: 'Inventory', sub: 'စတိုလက်ကျန်', icon: Package },
+    { id: 'customer-portal' as TabType, label: 'Site Portal', sub: 'ဆိုဒ်ဒက်ရှ်ဘုတ်', icon: Building2 },
+    { id: 'add-trip' as TabType, label: 'Add Trip', sub: 'ခရီးစဉ်ထုတ်', icon: PlusCircle, badge: null },
+    { id: 'history' as TabType, label: 'History', sub: 'မှတ်တမ်း', icon: History },
+    { id: 'site-billing' as TabType, label: 'Billing & Debt', sub: 'ငွေစာရင်း', icon: BarChart3 },
+    { id: 'drivers' as TabType, label: 'Drivers', sub: 'ယာဉ်မောင်း', icon: Users },
+    { id: 'vehicles' as TabType, label: 'Vehicles', sub: 'ယာဉ်များ', icon: Truck },
   ];
 
   return (

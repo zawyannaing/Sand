@@ -4,18 +4,19 @@ import { Driver } from '../types';
 import { DEFAULT_AVATAR } from '../data/mockData';
 
 interface DriversViewProps {
-  drivers: Driver[];
+  drivers?: Driver[];
   onAddDriver: (driver: Omit<Driver, 'id' | 'todayTrips' | 'todayVolume' | 'totalTrips'>) => void;
   onDeleteDriver: (driverId: string) => void;
   onSelectDriverForTrip: (driver: Driver) => void;
 }
 
 export const DriversView: React.FC<DriversViewProps> = ({
-  drivers,
+  drivers = [],
   onAddDriver,
   onDeleteDriver,
   onSelectDriverForTrip,
 }) => {
+  const safeDrivers = drivers || [];
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [name, setName] = useState('');
@@ -26,32 +27,32 @@ export const DriversView: React.FC<DriversViewProps> = ({
 
   // Driver summary metrics
   const totalTodayTrips = useMemo(() => {
-    return drivers.reduce((sum, d) => sum + (d.todayTrips || 0), 0);
-  }, [drivers]);
+    return safeDrivers.reduce((sum, d) => sum + (d.todayTrips || 0), 0);
+  }, [safeDrivers]);
 
   const totalTodayVolume = useMemo(() => {
-    return drivers.reduce((sum, d) => sum + (d.todayVolume || 0), 0);
-  }, [drivers]);
+    return safeDrivers.reduce((sum, d) => sum + (d.todayVolume || 0), 0);
+  }, [safeDrivers]);
 
   const activeOnlineCount = useMemo(() => {
-    return drivers.filter(d => d.status === 'online' || d.status === 'busy').length;
-  }, [drivers]);
+    return safeDrivers.filter(d => d.status === 'online' || d.status === 'busy').length;
+  }, [safeDrivers]);
 
   const totalDispatches = useMemo(() => {
-    return drivers.reduce((sum, d) => sum + (d.totalTrips || 0), 0);
-  }, [drivers]);
+    return safeDrivers.reduce((sum, d) => sum + (d.totalTrips || 0), 0);
+  }, [safeDrivers]);
 
   // Filtered drivers based on search
   const filteredDrivers = useMemo(() => {
-    if (!searchTerm.trim()) return drivers;
+    if (!searchTerm.trim()) return safeDrivers;
     const term = searchTerm.trim().toLowerCase();
-    return drivers.filter(d => 
+    return safeDrivers.filter(d => 
       d.burmeseName.toLowerCase().includes(term) ||
       d.name.toLowerCase().includes(term) ||
       d.licensePlate.toLowerCase().includes(term) ||
       d.phone.includes(term)
     );
-  }, [drivers, searchTerm]);
+  }, [safeDrivers, searchTerm]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

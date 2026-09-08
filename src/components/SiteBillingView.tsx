@@ -25,25 +25,27 @@ import { MATERIAL_LABELS } from '../data/mockData';
 import { syncAllTripsToSupabase } from '../services/supabaseClient';
 
 interface SiteBillingViewProps {
-  trips: Trip[];
+  trips?: Trip[];
   settings: AppSettings;
   onViewReceipt: (trip: Trip) => void;
 }
 
 export const SiteBillingView: React.FC<SiteBillingViewProps> = ({
-  trips,
+  trips = [],
   settings,
   onViewReceipt,
 }) => {
+  const safeTrips = trips || [];
+
   // Extract unique site / destination names from trips
   const uniqueSites = useMemo(() => {
     const siteMap = new Map<string, number>();
-    trips.forEach(t => {
+    safeTrips.forEach(t => {
       const site = t.destination?.trim() || 'Unspecified';
       siteMap.set(site, (siteMap.get(site) || 0) + 1);
     });
     return Array.from(siteMap.entries()).map(([site, count]) => ({ site, count }));
-  }, [trips]);
+  }, [safeTrips]);
 
   // State
   const [selectedSite, setSelectedSite] = useState<string>('all');
@@ -83,7 +85,7 @@ export const SiteBillingView: React.FC<SiteBillingViewProps> = ({
     const startOfWeek = startOfToday - (now.getDay() * 24 * 60 * 60 * 1000);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
 
-    return trips
+    return safeTrips
       .filter((trip) => {
         // Site filter
         if (selectedSite !== 'all' && trip.destination !== selectedSite) {

@@ -19,7 +19,7 @@ import { MATERIAL_LABELS } from '../data/mockData';
 import { syncAllTripsToSupabase } from '../services/supabaseClient';
 
 interface HistoryViewProps {
-  trips: Trip[];
+  trips?: Trip[];
   settings?: AppSettings;
   onViewReceipt: (trip: Trip) => void;
   onUpdateTripStatus: (tripId: string, status: Trip['status']) => void;
@@ -28,13 +28,14 @@ interface HistoryViewProps {
 }
 
 export const HistoryView: React.FC<HistoryViewProps> = ({
-  trips,
+  trips = [],
   settings,
   onViewReceipt,
   onUpdateTripStatus,
   onDeleteTrip,
   onAddNewTrip,
 }) => {
+  const safeTrips = trips || [];
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedMaterial, setSelectedMaterial] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
@@ -47,7 +48,7 @@ export const HistoryView: React.FC<HistoryViewProps> = ({
 
   // Memoized Filtering & Sorting to prevent render loops
   const filteredTrips = useMemo(() => {
-    return trips
+    return safeTrips
       .filter((trip) => {
         const query = searchTerm.toLowerCase().trim();
         const matchesSearch =
